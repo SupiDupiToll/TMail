@@ -1,0 +1,51 @@
+# Vendored, patched Tuta Rust SDK.
+#
+# Origin: https://github.com/tutao/tutanota at tag tutanota-release-362.261020.0
+# (commit f5e2d8628f17be558fe63130396ff625bbe69c77).
+#
+# This is a nested Cargo workspace so it can carry upstream's workspace
+# package metadata unchanged. Do not add it to the outer workspace.
+#
+# Local changes over upstream are recorded in vendor/tuta/PATCHES.md and are
+# GPL-3.0-or-later, like upstream. See /NOTICE.md.
+
+[workspace]
+resolver = "2"
+members = [
+    "tuta-sdk/rust/sdk",
+    "tuta-sdk/rust/crypto-primitives",
+    "tuta-sdk/rust/util",
+]
+default-members = []
+
+[workspace.package]
+version = "362.261020.0"
+rust-version = "1.84.0"
+edition = "2021"
+homepage = "https://tutao.de"
+repository = "https://github.com/tutao/tutanota"
+license-file = "LICENSE.txt"
+publish = false
+
+[workspace.dependencies]
+tuta-sdk = { path = "tuta-sdk/rust/sdk", default-features = false }
+crypto-primitives = { path = "tuta-sdk/rust/crypto-primitives", default-features = false }
+util = { path = "tuta-sdk/rust/util", default-features = false }
+base64 = { version = "0.22.1" }
+log = { version = "0.4.22" }
+serde = { version = "1.0.210", features = ["derive", "rc"] }
+serde_json = { version = "1.0.117" }
+tokio = { version = "1.43", default-features = false }
+uniffi = { git = "https://github.com/mozilla/uniffi-rs.git", rev = "13a1c559cb3708eeca40dcf95dc8b3ccccf3b88c", default-features = false }
+rand = { version = "0.8" }
+
+[workspace.lints.clippy]
+new_without_default = "allow"
+enum_variant_names = "allow"
+let_and_return = "allow"
+too_many_arguments = "allow"
+manual_let_else = "warn"
+must_use_candidate = "warn"
+unused_async = "warn"
+implicit_clone = "warn"
+explicit_iter_loop = "warn"

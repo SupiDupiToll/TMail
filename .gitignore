@@ -1,0 +1,13 @@
+/target
+/vendor/tuta/target
+node_modules/
+ui/node_modules/
+ui/.svelte-kit/
+ui/build/
+ui/dist/
+src-tauri/gen/schemas/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
