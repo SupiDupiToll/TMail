@@ -22,6 +22,8 @@ pub enum CoreError {
     TemporarilyUnavailable,
     #[error("sign-in failed: check the address and password")]
     BadCredentials,
+    #[error("the authenticator code was not accepted; try the next one")]
+    BadTotp,
     #[error("the OS keyring is unavailable")]
     KeyringUnavailable,
     #[error("the encrypted cache could not be opened")]
@@ -64,6 +66,7 @@ impl CoreError {
             Self::ClientRejected => "client_rejected",
             Self::TemporarilyUnavailable => "temporarily_unavailable",
             Self::BadCredentials => "bad_credentials",
+            Self::BadTotp => "bad_totp",
             Self::KeyringUnavailable => "keyring_unavailable",
             Self::CacheUnavailable | Self::CacheLocked => "cache_unavailable",
             Self::NotFound => "not_found",
@@ -81,7 +84,26 @@ impl From<ApiCallError> for CoreError {
     fn from(value: ApiCallError) -> Self {
         match &value {
             ApiCallError::RestClient { .. } => Self::Network("connection failed".into()),
-            ApiCallError::ServerResponseError { source } => Self::Api(source.to_string()),
+            ApiCallError::ServerResponseError { source } => match source {
+                tuta_sdk::rest_error::HttpError::NotAuthenticatedError
+                | tuta_sdk::rest_error::HttpError::SessionExpiredError
+                | tuta_sdk::rest_error::HttpError::AccessExpiredError
+                | tuta_sdk::rest_error::HttpError::AccessDeactivatedError
+                | tuta_sdk::rest_error::HttpError::AccessBlockedError => Self::SessionInvalid,
+                tuta_sdk::rest_error::HttpError::InvalidSoftwareVersionError => {
+                    Self::ClientRejected
+                }
+                tuta_sdk::rest_error::HttpError::NotFoundError => Self::NotFound,
+                tuta_sdk::rest_error::HttpError::ConnectionError
+                | tuta_sdk::rest_error::HttpError::RequestTimeoutError
+                | tuta_sdk::rest_error::HttpError::TooManyRequestsError { .. }
+                | tuta_sdk::rest_error::HttpError::InternalServerError
+                | tuta_sdk::rest_error::HttpError::BadGatewayError
+                | tuta_sdk::rest_error::HttpError::ServiceUnavailableError { .. } => {
+                    Self::TemporarilyUnavailable
+                }
+                other => Self::Api(other.to_string()),
+            },
             ApiCallError::InternalSdkError { .. } => Self::Protocol("SDK internal error".into()),
         }
     }

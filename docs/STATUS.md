@@ -12,27 +12,80 @@ Done.
 - Feature matrix in `docs/FEATURE-MATRIX.md`.
 - Legal review in `docs/LEGAL.md` (unofficial status, ToS clauses 7 and 12).
 
-Risks:
-- The official Rust SDK needs a patch stack to read bodies/attachments and
-  AEAD fields. Kept small and pinned; upstream changes can invalidate it.
-- No test account yet (see `docs/QUESTIONS.md`).
-- Tuta may restrict third-party clients at any time.
+## Phase 1 — Core crate
 
-## Phase 1 — Core crate (in progress)
+Done and unit-tested (59 tests):
 
-Working now:
+- Vendored, patched SDK at `tutanota-release-362.261020.0`; upstream + our
+  tests pass. Patch stack documented in `vendor/tuta/PATCHES.md`.
+- Sign-in with TOTP, session in Secret Service (memory fallback), BLAKE3-derived
+  SQLCipher cache, FTS5 search, folder tree, mail listing, body/attachment blob
+  reads, send + draft creation, move/trash/archive/delete.
+- Event bus with reconnect/backoff, cursor persistence, server counter
+  updates (persisted in `meta`), optimistic local counter adjustments.
+- Sender aliases: `GroupInfo.mailAddress` + enabled aliases, validated before
+  send, selectable in the composer.
+- Sending: non-confidential mail, plus automatic end-to-end encryption for
+  Tuta recipients (recipient key data via the public-key provider, RSA and
+  TutaCrypt); sender group identity is used for TutaCrypt.
+- Tuta-only network allowlist (owned domains only), bounded concurrency,
+  429/5xx backoff.
 
-- Vendored, patched SDK builds; upstream + our unit tests pass.
-- `tmail-core`: sign-in incl. TOTP, session in keyring (memory fallback),
-  SQLCipher cache + FTS5, folder tree, mail listing/body/attachments, send
-  and draft creation, move/trash/archive/delete, event-bus transport with
-  reconnect/backoff, host allowlist and HTTP retry.
-- 57 unit tests pass.
+Not yet: live-account verification; full incremental event replay into the
+cache (events trigger a folder refresh; counters are applied directly); draft
+editing in place.
 
-Not yet:
-- Live account verification.
-- Full incremental event application into the cache (events currently trigger
-  a targeted folder refresh; no replay of missed batches into the store).
-- Draft editing in place.
+## Phase 2 — Read-only mail + UI
 
-Next: Tauri commands, Svelte UI, test account smoke test.
+Done:
+
+- Tauri 2 shell: window, tray with close-to-tray fallback, single instance,
+  notifications, native save dialog, `mailto:` cold start, window state.
+- Svelte 5 UI: three-pane quiet-workspace layout, virtualised avatar list with no timestamps,
+  reader with sandboxed HTML, per-sender remote-content choice, attachments,
+  command palette, settings, keyboard shortcuts, light/dark/system, density.
+- Text-based verification: 24 Playwright tests + 12 Vitest tests pass (axe serious/critical = 0,
+  contrast computed numerically, 800/1280/1440/1920, 1.5 dpr, 200% text,
+  sandbox/CSP, keyboard traversal, archive undo).
+- Impeccable detector: 0 findings over `ui/src`.
+
+Screenshots (`docs/review-shots/`): login light/dark, inbox light/dark, reader
+light/dark, composer, palette, settings, mobile inbox/reader (14 images). **The owner should
+review the look manually; agents must not open the images.**
+
+## Phase 3 — Compose
+
+Working: send, reply, reply-all, forward, attachments, plain-text mode, sender
+alias selection, automatic E2E for Tuta recipients, save draft (create).
+
+Missing: rich-text editing, editing an existing draft, **password-protected
+external mail**. The latter needs Tuta's external-group creation flow and a
+Bcrypt KDF, neither of which is exposed by the Rust SDK at this tag; we refuse
+instead of silently downgrading. The composer shows an explicit "Not encrypted"
+state for external recipients.
+
+## Phase 4 — Management
+
+Working: move to folder, trash, archive, delete permanently, read/unread,
+bulk selection, local search.
+
+Missing: label management, inbox rules UI, spam classification UI.
+
+## Next
+
+1. Obtain the dedicated test account (`docs/QUESTIONS.md`) and run
+   `docs/SMOKE.md` (sender aliases, auto E2E, mail formatting).
+2. Add a `tauri-driver` smoke job for tray/notifications/mailto.
+3. Implement external confidential mail once the SDK exposes the external
+   group/Bcrypt flow (or port it carefully with live tests).
+4. Implement draft update + a search mode in the list pane.
+5. Measure 20k-message scroll and memory; revisit SQLCipher WAL if needed.
+6. Add contacts autocomplete and calendar after mail is proven.
+
+## Risks
+
+- Protocol patches are pinned to one upstream tag; a version bump can break
+  them. Treat as routine maintenance, test with the live account first.
+- Tuta may restrict third-party clients; the app is clearly unofficial.
+- No telemetry means we learn about production failures only from user reports;
+  error messages are designed to be actionable.

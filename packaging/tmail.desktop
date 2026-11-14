@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=TMail
+GenericName=Mail Client
+Comment=Unofficial, keyboard-first client for Tuta Mail
+Exec=tmail %u
+TryExec=tmail
+Icon=de.tmail.TMail
+Terminal=false
+Categories=Network;Email;
+Keywords=email;mail;tuta;encrypted;
+MimeType=x-scheme-handler/mailto;
+StartupNotify=true
+StartupWMClass=TMail
+X-GNOME-UsesNotifications=true

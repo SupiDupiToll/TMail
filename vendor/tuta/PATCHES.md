@@ -30,6 +30,7 @@ rsync -a --exclude uniffi-bindgen tuta-sdk/ /path/to/TMail/vendor/tuta/tuta-sdk/
 | 11 | AEAD group reads | AEAD v2 decryption with versioned group keys and KDF nonce | internal |
 | 12 | bucket instance keys | Resolve attachment keys from a mail's bucket | internal |
 | 13 | android logger | Honour the logging feature before installing Android logger | internal |
+| 14 | send recipient keys | Expose encryption of a send bucket key for internal recipients through the existing public-key provider (RSA and TutaCrypt) | internal |
 
 We do **not** submit these to tutao/tutanota: upstream rejects AI-assisted
 contributions. If a patch is independently rewritten and accepted upstream, it

@@ -82,6 +82,19 @@ impl CryptoFacade {
         &self.key_loader_facade
     }
 
+    /// Encrypts a bucket key for a recipient mail address, using the current
+    /// public key (RSA or TutaCrypt) returned by the public-key service.
+    pub async fn encrypt_bucket_key_for_recipient(
+        &self,
+        bucket_key: &GenericAesKey,
+        mail_address: &str,
+        sender_group_id: &GeneratedId,
+    ) -> Result<crate::crypto::asymmetric_crypto_facade::PubEncSymKey, AsymmetricCryptoError> {
+        self.asymmetric_crypto_facade
+            .encrypt_bucket_key_for_mail_address(bucket_key, mail_address, sender_group_id)
+            .await
+    }
+
     /// Returns the session key from `entity` and resolves the bucket key fields contained inside
     /// if present
     pub async fn resolve_session_key(

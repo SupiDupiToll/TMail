@@ -32,7 +32,7 @@ An unofficial, native desktop client for Tuta Mail, written from scratch. Target
 # Rust workspace (core crate: no UI dependency, headless-testable)
 cargo build -p tmail-core
 cargo test -p tmail-core
-cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets --no-deps -- -D warnings
 cargo fmt --all -- --check
 cargo audit            # if installed
 cargo deny check       # if installed
@@ -43,13 +43,17 @@ pnpm -C ui check       # svelte-check / types
 pnpm -C ui test        # vitest
 pnpm -C ui build
 
-# Desktop shell (Tauri 2)
-pnpm -C ui tauri dev
-pnpm -C ui tauri build
+# Desktop shell (Tauri 2), from the repository root
+pnpm tauri dev
+pnpm tauri build
+# Note: Tauri's config lives in src-tauri/; run the CLI from the root.
 
 # UI verification without images (Playwright, text output only)
 pnpm -C ui exec playwright test --reporter=line
-node tools/design-lint.mjs      # token/hard-coded-value lint
+# Review screenshots for the human owner (agents must not open them):
+SHOTS=1 pnpm -C ui exec playwright test tests/shots.spec.ts --reporter=line
+# Impeccable detector (code mode, no images):
+/home/baum/.agents/skills/impeccable/scripts/impeccable detect --json ui/src
 ```
 
 ## Repo layout

@@ -11,12 +11,16 @@ HTML mail is untrusted input. The renderer applies all of the following:
    no script, no event handlers, no forms, no `object`/`embed`/`iframe`, no
    `meta`, no `base`, no `javascript:`/`data:` links. Only safe presentation
    tags and inline styles are kept.
-2. **Sandboxed iframe** (`sandbox="allow-same-origin"` without
-   `allow-scripts`, or a `srcdoc` with the same) so a sanitiser bypass still
-   cannot run script in the app origin.
+2. **Script-free sandboxed iframe** with `sandbox="allow-same-origin"` and
+   **without** `allow-scripts`. The document has no script engine and its CSP
+   says `script-src 'none'`; same-origin access lets the trusted parent measure
+   the body and intercept links, while `allow-scripts` is deliberately absent so
+   a DOMPurify bypass still cannot execute. Links are rewritten to `data-href`
+   (no navigable `href`) and activated by the parent.
 3. **Strict CSP** in the iframe document:
-   `default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:`.
-   Remote images are **blocked by default**, which also blocks tracking pixels.
+   `default-src 'none'; script-src 'none'; img-src data:;
+   style-src 'unsafe-inline'; font-src data:`. Remote images are **blocked by
+   default**, which also blocks tracking pixels.
 4. **Per-sender opt-in** for remote content. The allowlist is stored by sender
    address, never by message, and is revocable in settings. Loading remote
    content re-renders with `img-src https:` only; scripts stay forbidden.
@@ -38,4 +42,5 @@ content by policy and never injects HTML into Tauri itself.
 - Mail looks “broken” until the user opts in to images; this is intentional
   and explained in the reader banner.
 - The UI test suite asserts the iframe sandbox, the CSP meta tag, absence of
-  `script` nodes and absence of remote image requests by default.
+  `script` nodes, link interception in the parent, and absence of remote image
+  requests by default.

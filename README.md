@@ -19,11 +19,14 @@ access to what you have read, and no telemetry.
 
 ## Status
 
-Early but functional core: sign-in with TOTP, encrypted local cache, folder
-tree, message list, body and attachment reads, send/reply/forward, move,
-trash, archive, delete, local full-text search, realtime event bus. The desktop
-shell and the Svelte UI are under active construction; see `docs/STATUS.md`
-for the exact state and `docs/FEATURE-MATRIX.md` for the roadmap.
+Working now: sign-in with TOTP, encrypted local cache, folder tree, a
+keyboard-first three-pane UI, sender avatars and a timestamp-free list, body
+and attachment reads that keep safe mail formatting, send/reply/forward with
+sender-alias selection, automatic E2E for Tuta recipients, move/trash/archive/
+delete, local full-text search, realtime event bus and a sandboxed HTML reader.
+Draft editing, rich-text compose, password-protected external mail, contacts and
+calendar are next; see `docs/STATUS.md` for the exact state and
+`docs/FEATURE-MATRIX.md` for the roadmap.
 
 ## Design principles
 
@@ -43,7 +46,7 @@ for the exact state and `docs/FEATURE-MATRIX.md` for the roadmap.
 sudo pacman -S --needed base-devel rust nodejs pnpm webkit2gtk-4.1 gtk3 libsoup3 openssl
 git clone <this repo> && cd TMail-for-Tuta
 pnpm -C ui install --frozen-lockfile
-cargo build --release -p tmail-desktop   # or: pnpm -C ui tauri build
+pnpm tauri build                      # or: cargo build --release -p tmail-desktop
 ```
 
 A `PKGBUILD` lives in `packaging/`. It builds from the tagged source with
@@ -55,7 +58,7 @@ locked Rust and pnpm dependencies.
 cargo test -p tmail-core            # headless core
 cargo clippy --workspace --all-targets -- -D warnings
 pnpm -C ui check
-pnpm -C ui tauri dev
+pnpm tauri dev
 ```
 
 Live integration tests need a dedicated test account; they are skipped unless
@@ -66,10 +69,14 @@ real mailbox.
 
 - Cache: SQLCipher, key derived from the Tuta group key (ADR 0004).
 - Session: Secret Service (gnome-keyring / KWallet); no plaintext fallback.
-- Renderer: DOMPurify + sandboxed iframe + strict CSP; remote images blocked by
-  default (ADR 0007).
+- Renderer: DOMPurify + a script-free sandboxed iframe + strict CSP; remote
+  images blocked by default (ADR 0007). Inline CSS is stripped from mail so a
+  sender cannot exfiltrate via `url()` or break the reader layout; typography is
+  ours.
 - Network: host allowlist, bounded concurrency, backoff on 429/5xx.
 - HTML mail, attachments and event payloads are untrusted input.
+- Mail CSS is filtered: presentation survives, but `url()` resource loads,
+  fixed positioning and animation are removed.
 
 ## License
 

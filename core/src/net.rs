@@ -21,6 +21,11 @@ use tuta_sdk::net::native_rest_client::NativeRestClient;
 const MAX_CONCURRENT: usize = 4;
 const MAX_ATTEMPTS: u32 = 3;
 
+/// Domains owned by Tutao. The API host is derived from configuration; blob
+/// storage may live on a different Tuta host, so the owned domains are allowed
+/// as well. Nothing else is reachable, including redirects to third parties.
+const TUTA_DOMAINS: &[&str] = &["tuta.com", "tutanota.com", "tuta.io", "tutanota.de"];
+
 pub struct GovernedRestClient {
     inner: NativeRestClient,
     allowed_scheme: String,
@@ -44,8 +49,20 @@ impl GovernedRestClient {
     }
 
     fn is_allowed(&self, url: &str) -> bool {
-        split_url(url).is_some_and(|(scheme, host)| {
-            scheme == self.allowed_scheme && host == self.allowed_host
+        let Some((scheme, host)) = split_url(url) else {
+            return false;
+        };
+        if scheme != self.allowed_scheme {
+            return false;
+        }
+        if host == self.allowed_host {
+            return true;
+        }
+        TUTA_DOMAINS.iter().any(|domain| {
+            host == *domain
+                || host
+                    .strip_suffix(domain)
+                    .is_some_and(|prefix| prefix.ends_with('.'))
         })
     }
 
@@ -71,7 +88,7 @@ impl RestClient for GovernedRestClient {
         if !self.is_allowed(&url) {
             log::error!(
                 "refused non-Tuta request to host {:?}",
-                split_url(&url).map(|(_, host)| host).as_deref()
+                split_url(&url).map(|(_, host)| host)
             );
             return Err(RestClientError::InvalidURL);
         }
@@ -132,13 +149,15 @@ fn split_url(url: &str) -> Option<(String, String)> {
         return None;
     }
     let authority = rest.split('/').next()?;
-    let host = authority.split('@').next_back()?;
-    let host = host.split(':').next()?;
-    if host.is_empty() {
-        None
-    } else {
-        Some((scheme, host.to_ascii_lowercase()))
+    // Reject userinfo: `https://tuta.com@evil.example/` must not pass.
+    if authority.contains('@') {
+        return None;
     }
+    let host = authority.split(':').next()?;
+    if host.is_empty() || host.parse::<std::net::IpAddr>().is_ok() {
+        return None;
+    }
+    Some((scheme, host.to_ascii_lowercase()))
 }
 
 /// Type-model cache directory for the SDK. Only schema JSON lives here — no
@@ -193,19 +212,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_the_configured_host_is_allowed() {
+    fn only_tuta_hosts_are_allowed() {
         let client = GovernedRestClient::new("https://app.tuta.com", "TMail/0.1").unwrap();
         assert!(client.is_allowed("https://app.tuta.com/rest/sys/saltservice"));
         assert!(client.is_allowed("https://app.tuta.com"));
+        assert!(client.is_allowed("https://blob1.tuta.com/blob"));
+        assert!(client.is_allowed("https://blob.tutanota.com/blob"));
+        assert!(client.is_allowed("https://tuta.io/x"));
         assert!(!client.is_allowed("https://evil.example/collect"));
+        assert!(!client.is_allowed("https://tuta.com.evil.example/x"));
+        assert!(!client.is_allowed("https://app.tuta.com@evil.example/x"));
         assert!(!client.is_allowed("http://app.tuta.com/x"));
+        assert!(!client.is_allowed("https://127.0.0.1/x"));
         assert!(!client.is_allowed("ftp://app.tuta.com/x"));
     }
 
     #[test]
     fn host_parser_handles_ports_and_userinfo() {
         assert_eq!(
-            split_url("https://a@App.Tuta.com:443/x")
+            split_url("https://App.Tuta.com:443/x")
                 .map(|(_, host)| host)
                 .as_deref(),
             Some("app.tuta.com")
@@ -216,6 +241,7 @@ mod tests {
                 .as_deref(),
             Some("app.tuta.com")
         );
+        assert_eq!(split_url("https://a@b.example/x"), None);
         assert_eq!(split_url("nonsense"), None);
     }
 }

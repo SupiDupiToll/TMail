@@ -26,3 +26,18 @@ We do not wait for answers; the safest default is implemented and noted here.
   only opened messages; a setting is planned.
 - Is SQLCipher's WAL growth acceptable for 50k+ message mailboxes? Default:
   current design; measure before changing (see ADR 0004).
+- `rsa` 0.9.10 has a Marvin-attack advisory. It is pinned by the official SDK;
+  porting to 0.10 by hand would put E2E crypto at risk. Default: stay on the
+  upstream-supported version (see `docs/SECURITY.md`). Revisit on the next SDK
+  bump.
+- Password-protected external mail needs Tuta's external-group creation and a
+  Bcrypt KDF. The Rust SDK exposes neither at this tag. Default: refuse the
+  mode and show an explicit "Not encrypted" state. Revisit with a live account.
+- Custom-domain Tuta recipients are indistinguishable from external addresses
+  by domain alone. Default: only `@tuta.com`, `@tutanota.com`, `@tuta.io` and
+  `@tutanota.de` are auto-encrypted; custom domains send unencrypted with the
+  external notice.
+- Which Tuta blob CDN hosts are used in production? The allowlist currently
+  permits the API host plus `*.tuta.com`, `*.tutanota.com`, `*.tuta.io`,
+  `*.tutanota.de`. If a real attachment needs another Tuta-owned host, add it
+  deliberately and record it in the ADR.

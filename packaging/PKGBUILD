@@ -1,0 +1,53 @@
+# Maintainer: TMail contributors
+pkgname=tmail
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Unofficial, keyboard-first desktop client for Tuta Mail"
+arch=('x86_64' 'aarch64')
+url="https://example.invalid/tmail"
+license=('GPL-3.0-or-later')
+depends=(
+  'webkit2gtk-4.1'
+  'gtk3'
+  'libsoup3'
+  'openssl'
+  'hicolor-icon-theme'
+  'desktop-file-utils'
+)
+makedepends=('rust' 'nodejs' 'pnpm' 'git' 'libappindicator-gtk3')
+# Replace with the tagged source archive when the repository is published.
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  # Locked JavaScript dependencies; the workspace pins pnpm in package.json.
+  pnpm install --frozen-lockfile
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  pnpm -C ui build
+  cargo build --release --locked -p tmail-desktop
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+
+  install -Dm755 target/release/tmail-desktop "$pkgdir/usr/bin/tmail"
+  install -Dm644 packaging/tmail.desktop \
+    "$pkgdir/usr/share/applications/tmail.desktop"
+  install -Dm644 packaging/de.tmail.TMail.metainfo.xml \
+    "$pkgdir/usr/share/metainfo/de.tmail.TMail.metainfo.xml"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 NOTICE.md "$pkgdir/usr/share/licenses/$pkgname/NOTICE.md"
+
+  install -Dm644 src-tauri/icons/32x32.png \
+    "$pkgdir/usr/share/icons/hicolor/32x32/apps/de.tmail.TMail.png"
+  install -Dm644 src-tauri/icons/128x128.png \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/de.tmail.TMail.png"
+  install -Dm644 src-tauri/icons/128x128@2x.png \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/de.tmail.TMail.png"
+  install -Dm644 src-tauri/icons/512x512.png \
+    "$pkgdir/usr/share/icons/hicolor/512x512/apps/de.tmail.TMail.png"
+}

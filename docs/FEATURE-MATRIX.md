@@ -15,9 +15,10 @@ deliberately out of scope.
 | Mail | Labels | later | not shown as folders |
 | Mail | Message list, newest first, virtualised | **MVP** | |
 | Mail | Unread state, mark read/unread | **MVP** | |
-| Mail | Message body (blob + draft storage) | **MVP** | |
+| Mail | Message body (blob + draft storage) | **MVP** | safe mail CSS/legacy markup preserved |
 | Mail | Attachment listing + save | **MVP** | |
 | Mail | Send, reply, reply-all, forward | **MVP** | reply threading via conversation entry |
+| Mail | Choose sender address / alias | **MVP** | From selector, validated against enabled aliases |
 | Mail | Drafts (create/save, resume editing) | partial | create/save works; editing an existing draft is `later` |
 | Mail | Signatures | later | settings model reserved |
 | Mail | Inbox rules | later | server rules are visible in API; UI later |
@@ -25,8 +26,8 @@ deliberately out of scope.
 | Mail | Spam handling | **MVP** | move to Spam folder |
 | Mail | Local search (subject, sender, body) | **MVP** | FTS5 |
 | Mail | Import/export (EML) | later | |
-| Mail | Confidential mail to Tuta recipients | **MVP** | |
-| Mail | Confidential mail to external recipients | later | needs password/key flow; refused rather than downgraded |
+| Mail | Confidential mail to Tuta recipients | **MVP** | automatic; internal recipient key data, TutaCrypt/RSA |
+| Mail | Confidential mail to external recipients | blocked | password/external-group flow not exposed by the SDK; refused rather than downgraded |
 | Mail | Offline reading of cached mail | **MVP** | headers always; bodies once opened |
 | Mail | Remote content opt-in per sender | **MVP** | |
 | Mail | Keyboard-first triage | **MVP** | `j/k`, `u`, `e`, `#`, `r`, `a`, `f`, `Ctrl+K` |

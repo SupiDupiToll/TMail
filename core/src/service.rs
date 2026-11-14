@@ -2,9 +2,10 @@
 //! the realtime event loop. This is the only type the Tauri shell talks to,
 //! which keeps the core usable from a CLI or another frontend unchanged.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use base64::prelude::{Engine, BASE64_STANDARD};
 use tuta_sdk::entities::generated::tutanota::Mail;
@@ -15,7 +16,7 @@ use crate::error::{CoreError, Result};
 use crate::event_bus::{EventBusClient, EventBusError, EventBusMessage, WsState};
 use crate::folders::{id_tuple, FolderNode, FolderTree};
 use crate::mail_ext::MailExt;
-use crate::models::{DraftInput, MailDetail, MailSummary, SearchHit, SendReceipt};
+use crate::models::{AttachmentMeta, DraftInput, MailDetail, MailSummary, SearchHit, SendReceipt};
 use crate::send::{send, Outgoing, OutgoingAttachment};
 use crate::session::{SessionStore, StoredSession};
 use crate::store::{wipe, Store};
@@ -48,6 +49,8 @@ pub struct Snapshot {
     pub connected: bool,
     pub cached_mails: usize,
     pub cached_bodies: usize,
+    /// Enabled sender addresses: primary first, then aliases.
+    pub sender_addresses: Vec<String>,
 }
 
 pub enum LoginOutcome {
@@ -58,12 +61,16 @@ pub enum LoginOutcome {
 struct Active {
     email: String,
     sdk: Arc<LoggedInSdk>,
-    mail: MailExt,
+    mail: Arc<MailExt>,
     store: Arc<Store>,
+    /// Server-authoritative unread counts by folder id. Populated by the
+    /// event bus and adjusted optimistically by local actions.
+    counters: Mutex<HashMap<String, usize>>,
     tree: RwLock<FolderTree>,
     access_token: String,
     user_id: String,
     display_name: String,
+    sender_addresses: Vec<String>,
     session_persisted: AtomicBool,
 }
 
@@ -108,6 +115,11 @@ impl CoreService {
             shutdown: std::sync::Mutex::new(shutdown),
             current_folder: std::sync::Mutex::new(None),
         })
+    }
+
+    #[must_use]
+    pub fn api_url(&self) -> &str {
+        &self.api_url
     }
 
     #[must_use]
@@ -180,7 +192,7 @@ impl CoreService {
             .get_user_id()
             .map(|id| id.0)
             .unwrap_or_else(|| stored.user_id.clone());
-        let display_name = load_display_name(&sdk).await;
+        let (display_name, sender_addresses) = load_account_identity(&sdk, &stored.email).await;
         let session_persisted =
             self.sessions.save(&stored).is_ok() && self.sessions.is_persistent();
         if !session_persisted {
@@ -190,15 +202,18 @@ impl CoreService {
             });
         }
 
+        let persisted_counters = store.load_counters().unwrap_or_default();
         let active = Arc::new(Active {
             email: stored.email.clone(),
             sdk,
-            mail,
+            mail: Arc::new(mail),
             store,
+            counters: Mutex::new(persisted_counters),
             tree: RwLock::new(tree),
             access_token: stored.access_token.clone(),
             user_id,
             display_name,
+            sender_addresses,
             session_persisted: AtomicBool::new(session_persisted),
         });
         *self.active.write().unwrap() = Some(Arc::clone(&active));
@@ -207,10 +222,7 @@ impl CoreService {
     }
 
     fn build_snapshot(&self, active: &Active) -> Snapshot {
-        let unread = active
-            .store
-            .unread_counts()
-            .unwrap_or_default()
+        let unread = merged_counts(active)
             .into_iter()
             .map(|(folder_id, unread)| FolderUnread { folder_id, unread })
             .collect();
@@ -224,6 +236,7 @@ impl CoreService {
             connected: false,
             cached_mails,
             cached_bodies,
+            sender_addresses: active.sender_addresses.clone(),
         }
     }
 
@@ -266,9 +279,7 @@ impl CoreService {
 
     pub fn unread_counts(&self) -> Result<Vec<FolderUnread>> {
         let active = self.active()?;
-        Ok(active
-            .store
-            .unread_counts()?
+        Ok(merged_counts(&active)
             .into_iter()
             .map(|(folder_id, unread)| FolderUnread { folder_id, unread })
             .collect())
@@ -356,7 +367,10 @@ impl CoreService {
                     .attachment_metas(&mail)
                     .await
                     .unwrap_or_default();
-                let detail = MailDetail::build(&mail, &details, attachments);
+                let mut detail = MailDetail::build(&mail, &details, attachments.clone());
+                detail.body_html =
+                    inline_images(&active, &mail, &detail.body_html, &attachments).await;
+                detail.body_text = crate::models::html_to_text(&detail.body_html);
                 active
                     .store
                     .put_body(id, &detail.body_html, &detail.body_text)?;
@@ -419,7 +433,15 @@ impl CoreService {
             .await
             .map_err(CoreError::from)?;
         for id in ids {
+            let previous = active.store.get_mail(id)?.map(|mail| mail.unread);
             active.store.set_unread(id, unread)?;
+            if previous == Some(unread) {
+                continue;
+            }
+            if let Some(mail) = active.store.get_mail(id)? {
+                let delta = if unread { 1isize } else { -1 };
+                adjust_counters(&active, &mail.folder_ids, delta);
+            }
         }
         let _ = self.events.send(SyncEvent::MailsChanged {
             folder_id: self.current_folder_name(),
@@ -492,6 +514,7 @@ impl CoreService {
         attachments: Vec<IncomingAttachment>,
     ) -> Result<SendReceipt> {
         let active = self.active()?;
+        let sender = selected_sender(&active, draft.sender_address.as_deref())?;
         let outgoing = Outgoing {
             to: draft.to,
             cc: draft.cc,
@@ -500,8 +523,9 @@ impl CoreService {
             body_html: draft.body_html,
             plaintext: draft.plaintext,
             confidential: draft.confidential,
+            confidential_password: draft.confidential_password,
             sender_name: active.display_name.clone(),
-            sender_address: active.email.clone(),
+            sender_address: sender,
             previous_message_id: draft.previous_message_id,
             conversation_type: draft.conversation_type,
             attachments: attachments
@@ -535,6 +559,7 @@ impl CoreService {
         attachments: Vec<IncomingAttachment>,
     ) -> Result<String> {
         let active = self.active()?;
+        let sender = selected_sender(&active, draft.sender_address.as_deref())?;
         let outgoing = Outgoing {
             to: draft.to,
             cc: draft.cc,
@@ -543,8 +568,9 @@ impl CoreService {
             body_html: draft.body_html,
             plaintext: draft.plaintext,
             confidential: draft.confidential,
+            confidential_password: draft.confidential_password,
             sender_name: active.display_name.clone(),
-            sender_address: active.email.clone(),
+            sender_address: sender,
             previous_message_id: draft.previous_message_id,
             conversation_type: draft.conversation_type,
             attachments: attachments
@@ -638,11 +664,35 @@ impl CoreService {
             });
         }
         let store = Arc::clone(&active.store);
+        let active_events = Arc::clone(&active);
         let events = self.events.clone();
         let cursor_handle = bus.last_batch_ids();
         tokio::spawn(async move {
             while let Some(message) = rx.recv().await {
                 match message {
+                    EventBusMessage::CounterUpdate(value) => {
+                        if let Ok(json) = serde_json::to_string(&value) {
+                            if let Ok(Some(counters)) = active_events
+                                .mail
+                                .decrypt_inline::<tuta_sdk::entities::generated::sys::WebsocketCounterData>(&json)
+                                .await
+                            {
+                                if let Ok(mut guard) = active_events.counters.lock() {
+                                    for value in counters.counterValues {
+                                        let count =
+                                            usize::try_from(value.count.max(0)).unwrap_or(0);
+                                        guard.insert(value.counterId.0.clone(), count);
+                                        let _ = active_events
+                                            .store
+                                            .save_counter(&value.counterId.0, count);
+                                    }
+                                }
+                                let _ = events.send(SyncEvent::MailsChanged {
+                                    folder_id: String::new(),
+                                });
+                            }
+                        }
+                    }
                     EventBusMessage::EntityUpdate(batch) => {
                         let _ = store.save_cursor(&batch.group_id, &batch.batch_id);
                         if let Ok(mut ids) = cursor_handle.lock() {
@@ -707,22 +757,113 @@ fn parse_id(id: &str) -> Result<IdTupleGenerated> {
     })
 }
 
-async fn load_display_name(sdk: &Arc<LoggedInSdk>) -> String {
+async fn load_account_identity(sdk: &Arc<LoggedInSdk>, email: &str) -> (String, Vec<String>) {
     let user = sdk.get_user();
     let group_info_id = user.userGroup.groupInfo.clone();
-    match sdk
+    let info = sdk
         .mail_facade()
         .get_crypto_entity_client()
         .load::<tuta_sdk::entities::generated::sys::GroupInfo, _>(&group_info_id)
         .await
-    {
-        Ok(info) if !info.name.is_empty() => info.name,
-        _ => user
-            .memberships
-            .iter()
-            .find(|m| m.groupType == Some(1))
-            .map(|m| m.group.0.clone())
-            .unwrap_or_default(),
+        .ok();
+
+    let name = info
+        .as_ref()
+        .map(|info| info.name.clone())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_default();
+
+    let mut addresses = Vec::new();
+    if let Some(info) = &info {
+        if let Some(primary) = &info.mailAddress {
+            addresses.push(primary.to_ascii_lowercase());
+        }
+        for alias in &info.mailAddressAliases {
+            if alias.enabled {
+                addresses.push(alias.mailAddress.to_ascii_lowercase());
+            }
+        }
+    }
+    let primary = email.to_ascii_lowercase();
+    if !addresses.iter().any(|address| address == &primary) {
+        addresses.insert(0, primary);
+    }
+    addresses.dedup();
+    (name, addresses)
+}
+
+/// Replaces `cid:` image references with data URLs for small inline
+/// attachments, so a message renders its signature/logo without network access.
+async fn inline_images(
+    active: &Active,
+    mail: &Mail,
+    html: &str,
+    attachments: &[AttachmentMeta],
+) -> String {
+    use base64::prelude::{Engine, BASE64_STANDARD};
+    let mut out = html.to_string();
+    for attachment in attachments {
+        let Some(cid) = attachment.cid.as_deref() else {
+            continue;
+        };
+        let token = format!("cid:{cid}");
+        if !out.contains(&token) {
+            continue;
+        }
+        if attachment.size > 2 * 1024 * 1024 {
+            log::debug!(
+                "inline image {} is too large; leaving it blocked",
+                attachment.name
+            );
+            continue;
+        }
+        match active.mail.download_attachment(mail, &attachment.id).await {
+            Ok(bytes) => {
+                let encoded = BASE64_STANDARD.encode(bytes);
+                let data_url = format!("data:{};base64,{encoded}", attachment.mime_type);
+                out = out.replace(&token, &data_url);
+            }
+            Err(error) => log::debug!("inline image {} unavailable: {error}", attachment.name),
+        }
+    }
+    out
+}
+
+fn selected_sender(active: &Active, requested: Option<&str>) -> Result<String> {
+    let requested = requested
+        .unwrap_or(&active.email)
+        .trim()
+        .to_ascii_lowercase();
+    matching_address(&active.sender_addresses, &requested).ok_or_else(|| {
+        CoreError::InvalidInput("this sender address is not enabled for the account".into())
+    })
+}
+
+fn matching_address(addresses: &[String], wanted: &str) -> Option<String> {
+    addresses
+        .iter()
+        .find(|address| address.eq_ignore_ascii_case(wanted))
+        .cloned()
+}
+
+fn merged_counts(active: &Active) -> HashMap<String, usize> {
+    let mut counts = active.store.unread_counts().unwrap_or_default();
+    if let Ok(guard) = active.counters.lock() {
+        for (folder, count) in guard.iter() {
+            counts.insert(folder.clone(), *count);
+        }
+    }
+    counts
+}
+
+fn adjust_counters(active: &Active, folder_ids: &[String], delta: isize) {
+    if let Ok(mut guard) = active.counters.lock() {
+        for folder in folder_ids {
+            let current = guard.get(folder).copied().unwrap_or(0);
+            let next = (current as isize + delta).max(0) as usize;
+            guard.insert(folder.clone(), next);
+            let _ = active.store.save_counter(folder, next);
+        }
     }
 }
 

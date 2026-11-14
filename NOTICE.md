@@ -35,6 +35,16 @@ Adapted files in this repository:
 Changes are described per-file in the module documentation and in
 `docs/adr/0006-tutabridge-reuse.md`.
 
+### Fonts
+
+- **Atkinson Hyperlegible Next** — Copyright 2020-2024 Braille Institute of
+  America, Inc. SIL Open Font License 1.1; license text in
+  `ui/static/fonts/OFL-Atkinson.txt`.
+- **Source Serif 4** — Copyright 2014-2024 Adobe. SIL Open Font License 1.1;
+  license text in `ui/static/fonts/OFL-SourceSerif.txt`.
+
+Both are self-hosted; no font CDN is contacted at runtime.
+
 ### Other dependencies
 
 The Rust and JavaScript dependency trees are pinned in `Cargo.lock` and

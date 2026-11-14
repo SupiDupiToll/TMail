@@ -106,6 +106,8 @@ pub struct AttachmentMeta {
     pub mime_type: String,
     pub size: i64,
     pub is_inline: bool,
+    /// Content id for inline images (`cid:` references in the body).
+    pub cid: Option<String>,
 }
 
 impl AttachmentMeta {
@@ -125,6 +127,7 @@ impl AttachmentMeta {
                 .unwrap_or_else(|| "application/octet-stream".to_string()),
             size: file.size,
             is_inline: file.cid.is_some(),
+            cid: file.cid.clone(),
         }
     }
 }
@@ -214,6 +217,12 @@ pub struct DraftInput {
     pub plaintext: bool,
     #[serde(default)]
     pub confidential: bool,
+    /// Password for external recipients when confidential is enabled.
+    #[serde(default)]
+    pub confidential_password: Option<String>,
+    /// Sender address chosen in the composer (must be an enabled alias).
+    #[serde(default)]
+    pub sender_address: Option<String>,
     /// Reply/forward linkage, if any.
     #[serde(default)]
     pub previous_mail: Option<String>,

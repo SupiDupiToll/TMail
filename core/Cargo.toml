@@ -27,7 +27,7 @@ async-trait = "0.1"
 
 # Encrypted-at-rest cache. SQLCipher is compiled in (vendored OpenSSL) so the
 # Arch package does not depend on a system SQLCipher build.
-rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+rusqlite = { version = "0.42", features = ["bundled-sqlcipher-vendored-openssl"] }
 
 # OS keyring: Secret Service on Linux (gnome-keyring / KWallet).
 [target.'cfg(target_os = "linux")'.dependencies]

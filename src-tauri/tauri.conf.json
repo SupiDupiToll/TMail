@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TMail",
+  "version": "0.1.0",
+  "identifier": "de.tmail.TMail",
+  "build": {
+    "beforeDevCommand": "pnpm -C ui dev",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "pnpm -C ui build",
+    "frontendDist": "../ui/build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "TMail",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 900,
+        "minHeight": 580,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "transparent": false,
+        "dragDropEnabled": true,
+        "zoomHotkeysEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src ipc: http://ipc.localhost; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'none'",
+      "dangerousDisableAssetCspModification": false,
+      "devCsp": "default-src 'self' http://127.0.0.1:5173; img-src 'self' data: http://127.0.0.1:5173; style-src 'self' 'unsafe-inline' http://127.0.0.1:5173; font-src 'self' data: http://127.0.0.1:5173; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:5173; connect-src ipc: http://ipc.localhost http://127.0.0.1:5173 ws://127.0.0.1:5173; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "deb",
+      "appimage"
+    ],
+    "category": "Productivity",
+    "shortDescription": "Unofficial native client for Tuta Mail",
+    "longDescription": "TMail is an unofficial, keyboard-first desktop client for Tuta Mail with an encrypted local cache, instant search and a sandboxed mail reader.",
+    "license": "GPL-3.0-or-later",
+    "licenseFile": "../LICENSE",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png"
+    ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0"
+        ]
+      }
+    }
+  }
+}

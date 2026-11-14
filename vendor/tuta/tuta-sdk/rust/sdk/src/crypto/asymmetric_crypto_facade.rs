@@ -15,8 +15,8 @@ use crate::services::generated::sys::PublicKeyService;
 #[cfg_attr(test, mockall_double::double)]
 use crate::services::service_executor::ServiceExecutor;
 use crate::services::ExtraServiceParams;
-use crate::tutanota_constants::CryptoProtocolVersion;
 use crate::tutanota_constants::EncryptionAuthStatus;
+use crate::tutanota_constants::{CryptoProtocolVersion, PublicKeyIdentifierType};
 use crate::util::convert_version_to_u64;
 use crate::ApiCallError;
 use crate::GeneratedId;
@@ -54,6 +54,33 @@ pub struct PubEncSymKey {
     crypto_protocol_version: CryptoProtocolVersion,
     sender_key_version: Option<u64>,
     recipient_key_version: u64,
+}
+
+impl PubEncSymKey {
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.pub_enc_sym_key_bytes
+    }
+
+    #[must_use]
+    pub fn protocol_version(&self) -> i64 {
+        match self.crypto_protocol_version {
+            CryptoProtocolVersion::Rsa => 0,
+            CryptoProtocolVersion::SymmetricEncryption => 1,
+            CryptoProtocolVersion::TutaCrypt => 2,
+        }
+    }
+
+    #[must_use]
+    pub fn sender_key_version(&self) -> Option<i64> {
+        self.sender_key_version
+            .and_then(|version| i64::try_from(version).ok())
+    }
+
+    #[must_use]
+    pub fn recipient_key_version(&self) -> i64 {
+        i64::try_from(self.recipient_key_version).unwrap_or(i64::MAX)
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -288,6 +315,26 @@ impl AsymmetricCryptoFacade {
                 }
             }
         }
+    }
+
+    /// Loads the current public key for `mail_address` and encrypts `bucket_key`
+    /// for that recipient. Used by clients that implement their own send flow.
+    pub async fn encrypt_bucket_key_for_mail_address(
+        &self,
+        bucket_key: &GenericAesKey,
+        mail_address: &str,
+        sender_group_id: &GeneratedId,
+    ) -> Result<PubEncSymKey, AsymmetricCryptoError> {
+        let identifier = PublicKeyIdentifier {
+            identifier: mail_address.trim().to_lowercase(),
+            identifier_type: PublicKeyIdentifierType::MailAddress,
+        };
+        let recipient_public_key = self
+            .public_key_provider
+            .load_current_pub_key(&identifier)
+            .await?;
+        self.asym_encrypt_sym_key(bucket_key.clone(), recipient_public_key, sender_group_id)
+            .await
     }
 
     /// Encrypts the symKey asymmetrically with the provided public keys using the TutaCrypt protocol.
@@ -612,8 +659,8 @@ mod tests {
         use crate::crypto::{Aes256Key, TutaCryptKeyPairs, X25519PublicKey};
         use crate::entities::generated::sys::PubEncKeyData;
         use crate::services::generated::sys::PublicKeyService;
-        use crate::tutanota_constants::CryptoProtocolVersion;
         use crate::tutanota_constants::PublicKeyIdentifierType;
+        use crate::tutanota_constants::{CryptoProtocolVersion, PublicKeyIdentifierType};
         use crate::util::test_utils::{get_kyber_pub_key_bytes, get_x25519_pub_key_bytes};
         use crypto_primitives::aes::InitializationVector;
         use crypto_primitives::key::GenericAesKey;
@@ -750,7 +797,7 @@ mod tests {
         use crate::crypto::tuta_crypt::TutaCryptMessage;
         use crate::crypto::x25519::X25519KeyPair;
         use crate::crypto::{Aes256Key, TutaCryptKeyPairs};
-        use crate::tutanota_constants::CryptoProtocolVersion;
+        use crate::tutanota_constants::{CryptoProtocolVersion, PublicKeyIdentifierType};
         use crypto_primitives::aes::InitializationVector;
         use crypto_primitives::key::GenericAesKey;
         use crypto_primitives::randomizer_facade::test_util::make_thread_rng_facade;
@@ -867,7 +914,7 @@ mod tests {
         use crate::key_loader_facade::MockKeyLoaderFacade;
         use crate::services::generated::sys::PublicKeyService;
         use crate::services::service_executor::MockServiceExecutor;
-        use crate::tutanota_constants::CryptoProtocolVersion;
+        use crate::tutanota_constants::{CryptoProtocolVersion, PublicKeyIdentifierType};
         use crate::ExtraServiceParams;
         use crate::GeneratedId;
         use crate::GenericAesKey;

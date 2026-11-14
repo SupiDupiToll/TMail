@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>de.tmail.TMail</id>
+  <name>TMail</name>
+  <summary>Unofficial, keyboard-first client for Tuta Mail</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>
+      TMail is an independent desktop client for Tuta Mail. It keeps Tuta's
+      end-to-end encryption intact while treating the mailbox as a local,
+      encrypted database: instant list scrolling, full-text search and offline
+      reading of messages you have already opened.
+    </p>
+    <p>
+      The interface is built for the keyboard: j and k to move, Enter to open,
+      c to compose, Ctrl+K for every action. HTML mail is rendered in a
+      sandboxed frame, and remote images and tracking pixels are blocked until
+      you allow them per sender.
+    </p>
+    <p>
+      TMail is not affiliated with, endorsed by or supported by Tutao GmbH.
+      "Tuta" is used only to describe the service it connects to.
+    </p>
+  </description>
+  <launchable type="desktop-id">tmail.desktop</launchable>
+  <provides>
+    <binary>tmail</binary>
+  </provides>
+  <categories>
+    <category>Network</category>
+    <category>Email</category>
+  </categories>
+  <url type="homepage">https://example.invalid/tmail</url>
+  <url type="bugtracker">https://example.invalid/tmail/issues</url>
+  <releases>
+    <release version="0.1.0" date="2026-11-14">
+      <description>
+        <p>First development snapshot: sign-in, folders, message list, reader,
+        composer, local search, encrypted cache and realtime events.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

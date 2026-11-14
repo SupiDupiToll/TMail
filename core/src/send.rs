@@ -14,7 +14,7 @@ use crypto_primitives::randomizer_facade::RandomizerFacade;
 use tuta_sdk::blobs::blob_facade::FileData;
 use tuta_sdk::entities::generated::tutanota::{
     AttachmentKeyData, DraftAttachment, DraftCreateData, DraftData, DraftRecipient,
-    NewDraftAttachment, SendDraftData, SendDraftParameters,
+    InternalRecipientKeyData, NewDraftAttachment, SendDraftData, SendDraftParameters,
 };
 use tuta_sdk::services::generated::tutanota::{DraftService, SendDraftService};
 use tuta_sdk::services::ExtraServiceParams;
@@ -44,6 +44,8 @@ pub struct Outgoing {
     pub body_html: String,
     pub plaintext: bool,
     pub confidential: bool,
+    /// Password for external recipients when confidential mode is enabled.
+    pub confidential_password: Option<String>,
     pub sender_name: String,
     pub sender_address: String,
     pub previous_message_id: Option<String>,
@@ -57,21 +59,94 @@ struct CreatedDraft {
     attachment_keys: Vec<GenericAesKey>,
 }
 
+fn is_tuta_address(address: &str) -> bool {
+    let address = address.trim().to_ascii_lowercase();
+    ["@tuta.com", "@tutanota.com", "@tuta.io", "@tutanota.de"]
+        .iter()
+        .any(|domain| address.ends_with(domain))
+}
+
+fn all_tuta(outgoing: &Outgoing) -> bool {
+    let addresses = outgoing.to.iter().chain(&outgoing.cc).chain(&outgoing.bcc);
+    let mut any = false;
+    for address in addresses {
+        any = true;
+        if !is_tuta_address(address) {
+            return false;
+        }
+    }
+    any
+}
+
+fn effective_confidential(outgoing: &Outgoing) -> bool {
+    outgoing.confidential || all_tuta(outgoing)
+}
+
 /// Creates a draft and immediately submits it for sending.
 pub async fn send(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<(String, String)> {
     validate(outgoing)?;
     let randomizer = RandomizerFacade::from_core(rand_core::OsRng);
-    let draft = create_draft(sdk, outgoing, &randomizer).await?;
+    let confidential = effective_confidential(outgoing);
+    let draft = create_draft(sdk, outgoing, confidential, &randomizer).await?;
 
     let attachment_keys = if draft.attachment_keys.is_empty() {
         Vec::new()
     } else {
         attachment_key_data(sdk, &draft.id, &draft.attachment_keys, &randomizer).await?
     };
+    let (mail_session_key, bucket_enc_mail_session_key, internal_keys, auth_status) =
+        if confidential {
+            let bucket_key: GenericAesKey = Aes256Key::generate(&randomizer).into();
+            let bucket_enc = bucket_key.encrypt_key(
+                &draft.session_key,
+                InitializationVector::generate(&randomizer),
+            );
+            let crypto_client = sdk.mail_facade().get_crypto_entity_client();
+            let crypto = crypto_client.get_crypto_facade();
+            let sender_group_id = sdk.get_user_group_id();
+            let mut keys = Vec::new();
+            let mut all_tuta_crypt = true;
+            for address in outgoing.to.iter().chain(&outgoing.cc).chain(&outgoing.bcc) {
+                let key = crypto
+                    .encrypt_bucket_key_for_recipient(&bucket_key, address, &sender_group_id)
+                    .await
+                    .map_err(|error| {
+                        CoreError::Protocol(format!("recipient key encryption failed: {error}"))
+                    })?;
+                all_tuta_crypt &= key.protocol_version() == 2;
+                keys.push(InternalRecipientKeyData {
+                    _id: None,
+                    mailAddress: address.trim().to_ascii_lowercase(),
+                    pubEncBucketKey: key.bytes().to_vec(),
+                    recipientKeyVersion: key.recipient_key_version(),
+                    protocolVersion: key.protocol_version(),
+                    senderKeyVersion: key.sender_key_version(),
+                });
+            }
+            let auth_status = if all_tuta_crypt {
+                draft
+                    .session_key
+                    .encrypt_data(b"4", InitializationVector::generate(&randomizer))
+                    .ok()
+            } else {
+                None
+            };
+            (None, Some(bucket_enc), keys, auth_status)
+        } else {
+            (
+                Some(draft.session_key.as_bytes().to_vec()),
+                None,
+                Vec::new(),
+                None,
+            )
+        };
     let parameters_id =
         CustomId(BASE64_URL_SAFE_NO_PAD.encode(randomizer.generate_random_array::<4>()));
     let data = build_send_data(
-        draft.session_key.as_bytes().to_vec(),
+        mail_session_key,
+        bucket_enc_mail_session_key,
+        internal_keys,
+        auth_status,
         draft.id.clone(),
         parameters_id,
         attachment_keys,
@@ -92,7 +167,7 @@ pub async fn send(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<(String
 pub async fn save_draft(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<String> {
     validate(outgoing)?;
     let randomizer = RandomizerFacade::from_core(rand_core::OsRng);
-    let draft = create_draft(sdk, outgoing, &randomizer).await?;
+    let draft = create_draft(sdk, outgoing, effective_confidential(outgoing), &randomizer).await?;
     Ok(format!("{}/{}", draft.id.list_id.0, draft.id.element_id.0))
 }
 
@@ -114,23 +189,11 @@ fn validate(outgoing: &Outgoing) -> Result<()> {
             "check the recipient addresses".into(),
         ));
     }
-    if outgoing.confidential
-        && outgoing
-            .to
-            .iter()
-            .chain(&outgoing.cc)
-            .chain(&outgoing.bcc)
-            .any(|a| {
-                !a.to_ascii_lowercase().ends_with("@tuta.com")
-                    && !a.to_ascii_lowercase().ends_with("@tutanota.com")
-                    && !a.to_ascii_lowercase().ends_with("@tuta.io")
-            })
-    {
-        // The official client needs extra key/password material for encrypted
-        // mail to external recipients. Refuse rather than silently send in
-        // the clear.
+    if outgoing.confidential && !all_tuta(outgoing) {
+        // The external-group/Bcrypt flow is not exposed by the SDK yet. Refuse
+        // before a draft is created so nothing is left behind on the server.
         return Err(CoreError::InvalidInput(
-            "confidential mail to non-Tuta recipients is not supported yet".into(),
+            "password-protected mail to external recipients is not available yet".into(),
         ));
     }
     Ok(())
@@ -139,6 +202,7 @@ fn validate(outgoing: &Outgoing) -> Result<()> {
 async fn create_draft(
     sdk: &Arc<LoggedInSdk>,
     outgoing: &Outgoing,
+    confidential: bool,
     randomizer: &RandomizerFacade,
 ) -> Result<CreatedDraft> {
     let session_key: GenericAesKey = Aes256Key::generate(randomizer).into();
@@ -177,7 +241,7 @@ async fn create_draft(
         } else {
             outgoing.sender_name.clone()
         },
-        confidential: outgoing.confidential,
+        confidential,
         method: 0,
         compressedBodyText: Some(outgoing.body_html.clone()),
         toRecipients: recipients(&outgoing.to),
@@ -327,7 +391,10 @@ async fn attachment_key_data(
 }
 
 fn build_send_data(
-    session_key: Vec<u8>,
+    mail_session_key: Option<Vec<u8>>,
+    bucket_enc_mail_session_key: Option<Vec<u8>>,
+    internal_recipient_key_data: Vec<InternalRecipientKeyData>,
+    session_enc_encryption_auth_status: Option<Vec<u8>>,
     draft: IdTupleGenerated,
     parameters_id: CustomId,
     attachment_key_data: Vec<AttachmentKeyData>,
@@ -336,14 +403,14 @@ fn build_send_data(
     let parameters = SendDraftParameters {
         _id: Some(parameters_id),
         language: "en".into(),
-        mailSessionKey: Some(session_key.clone()),
-        bucketEncMailSessionKey: None,
+        mailSessionKey: mail_session_key.clone(),
+        bucketEncMailSessionKey: bucket_enc_mail_session_key.clone(),
         senderNameUnencrypted: None,
         plaintext,
         calendarMethod: false,
-        sessionEncEncryptionAuthStatus: None,
+        sessionEncEncryptionAuthStatus: session_enc_encryption_auth_status.clone(),
         mail: draft.clone(),
-        internalRecipientKeyData: Vec::new(),
+        internalRecipientKeyData: internal_recipient_key_data.clone(),
         secureExternalRecipientKeyData: Vec::new(),
         symEncInternalRecipientKeyData: Vec::new(),
         attachmentKeyData: attachment_key_data.clone(),
@@ -351,15 +418,15 @@ fn build_send_data(
     SendDraftData {
         _format: 0,
         language: "en".into(),
-        mailSessionKey: Some(session_key),
-        bucketEncMailSessionKey: None,
+        mailSessionKey: mail_session_key,
+        bucketEncMailSessionKey: bucket_enc_mail_session_key,
         senderNameUnencrypted: None,
         plaintext,
         calendarMethod: false,
-        sessionEncEncryptionAuthStatus: None,
+        sessionEncEncryptionAuthStatus: session_enc_encryption_auth_status,
         sendAt: None,
         allowUndo: false,
-        internalRecipientKeyData: Vec::new(),
+        internalRecipientKeyData: internal_recipient_key_data,
         secureExternalRecipientKeyData: Vec::new(),
         attachmentKeyData: attachment_key_data,
         mail: draft.clone(),
@@ -390,6 +457,7 @@ mod tests {
             body_html: "<p>Hello</p>".into(),
             plaintext: false,
             confidential: false,
+            confidential_password: None,
             sender_name: "Me".into(),
             sender_address: "me@tuta.com".into(),
             previous_message_id: None,
@@ -410,11 +478,24 @@ mod tests {
     }
 
     #[test]
-    fn refuses_confidential_mail_to_external_recipients() {
+    fn external_confidential_is_refused_before_creating_a_draft() {
         let mut mail = outgoing();
         mail.confidential = true;
         assert!(validate(&mail).is_err());
+        mail.confidential_password = Some("correct horse battery staple".into());
+        assert!(validate(&mail).is_err());
         mail.to = vec!["friend@tuta.com".into()];
         assert!(validate(&mail).is_ok());
+    }
+
+    #[test]
+    fn tuta_recipients_are_always_confidential() {
+        let mut mail = outgoing();
+        mail.to = vec!["friend@tuta.com".into()];
+        assert!(effective_confidential(&mail));
+        mail.to = vec!["friend@example.com".into()];
+        assert!(!effective_confidential(&mail));
+        mail.confidential = true;
+        assert!(effective_confidential(&mail));
     }
 }

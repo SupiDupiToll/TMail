@@ -241,6 +241,39 @@ impl Store {
         .map_err(CoreError::from)
     }
 
+    pub fn save_counter(&self, folder_id: &str, count: usize) -> Result<()> {
+        let conn = self.conn();
+        conn.execute(
+            "INSERT INTO meta(key,value) VALUES(?1,?2)\
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            params![format!("counter:{folder_id}"), count.to_string()],
+        )
+        .map_err(CoreError::from)?;
+        Ok(())
+    }
+
+    pub fn load_counters(&self) -> Result<std::collections::HashMap<String, usize>> {
+        let conn = self.conn();
+        let mut stmt = conn
+            .prepare("SELECT key,value FROM meta WHERE key LIKE 'counter:%'")
+            .map_err(CoreError::from)?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(CoreError::from)?;
+        let mut out = std::collections::HashMap::new();
+        for row in rows {
+            let (key, value) = row.map_err(CoreError::from)?;
+            if let Some(folder) = key.strip_prefix("counter:") {
+                if let Ok(count) = value.parse::<usize>() {
+                    out.insert(folder.to_string(), count);
+                }
+            }
+        }
+        Ok(out)
+    }
+
     pub fn save_folders(&self, json: &str) -> Result<()> {
         let conn = self.conn();
         conn.execute(
@@ -405,6 +438,8 @@ impl Store {
             params![self.account],
         )
         .map_err(CoreError::from)?;
+        tx.execute("DELETE FROM meta WHERE key LIKE 'counter:%'", [])
+            .map_err(CoreError::from)?;
         if self.fts {
             tx.execute(
                 "DELETE FROM mail_fts WHERE account=?1",
@@ -541,6 +576,23 @@ mod tests {
         let mut wrong = [9u8; 32];
         let path = dir.path().join("cache.db");
         assert!(Store::open(&path, "me@tuta.com", &mut wrong).is_err());
+    }
+
+    #[test]
+    fn counters_survive_reopen_and_clear() {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let store = store(dir.path());
+            store.save_counter("inbox", 7).unwrap();
+            store.save_counter("work", 2).unwrap();
+            let loaded = store.load_counters().unwrap();
+            assert_eq!(loaded.get("inbox"), Some(&7));
+            assert_eq!(loaded.get("work"), Some(&2));
+        }
+        let reopened = store(dir.path());
+        assert_eq!(reopened.load_counters().unwrap().len(), 2);
+        reopened.clear().unwrap();
+        assert!(reopened.load_counters().unwrap().is_empty());
     }
 
     #[test]

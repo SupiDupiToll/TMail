@@ -103,16 +103,20 @@ impl AuthService {
     /// Submits a TOTP code and waits until the server marks the session
     /// approved (the server may take a moment after the code is accepted).
     pub async fn submit_totp(&self, code: u32) -> Result<StoredSession> {
-        let pending = self
-            .pending
-            .lock()
-            .await
-            .take()
-            .ok_or(CoreError::SecondFactorRequired)?;
+        // Keep the pending session until the code is accepted, so a mistyped
+        // code can be retried without asking for the password again.
+        let pending = {
+            let guard = self.pending.lock().await;
+            guard.as_ref().map(|pending| PendingLogin {
+                email: pending.email.clone(),
+                credentials: pending.credentials.clone(),
+            })
+        }
+        .ok_or(CoreError::SecondFactorRequired)?;
         self.sdk
             .authenticate_with_second_factor_totp(&pending.credentials.access_token, code)
             .await
-            .map_err(|_| CoreError::BadCredentials)?;
+            .map_err(|_| CoreError::BadTotp)?;
 
         let mut approved = false;
         for _ in 0..30 {
@@ -140,6 +144,7 @@ impl AuthService {
             .login(pending.credentials)
             .await
             .map_err(CoreError::from)?;
+        *self.pending.lock().await = None;
         Ok(stored)
     }
 
