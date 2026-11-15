@@ -35,10 +35,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "deb",
-      "appimage"
-    ],
+    "targets": "all",
     "category": "Productivity",
     "shortDescription": "Unofficial native client for Tuta Mail",
     "longDescription": "TMail is an unofficial, keyboard-first desktop client for Tuta Mail with an encrypted local cache, instant search and a sandboxed mail reader.",
@@ -48,7 +45,9 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.png"
+      "icons/icon.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
     ],
     "linux": {
       "deb": {
@@ -57,6 +56,7 @@
           "libgtk-3-0"
         ]
       }
-    }
+    },
+    "copyright": "Copyright (c) TMail contributors"
   }
 }

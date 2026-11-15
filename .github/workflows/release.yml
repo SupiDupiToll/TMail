@@ -1,0 +1,138 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            platform: ubuntu-22.04
+            args: ""
+            rust_targets: "x86_64-unknown-linux-gnu"
+            bundle_dir: "src-tauri/target/release/bundle"
+          - name: Windows x86_64
+            platform: windows-latest
+            args: ""
+            rust_targets: "x86_64-pc-windows-msvc"
+            bundle_dir: "src-tauri/target/release/bundle"
+          - name: macOS universal
+            platform: macos-latest
+            args: "--target universal-apple-darwin"
+            rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+            bundle_dir: "src-tauri/target/universal-apple-darwin/release/bundle"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential curl wget file patchelf rpm libfuse2 \
+            libssl-dev libxdo-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and publish draft release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "TMail ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+          releaseBody: |
+            **TMail ${{ github.ref_name }}** — an unofficial desktop client for Tuta Mail.
+
+            Packages:
+            - Linux: `.deb`, `.rpm`, `.AppImage` (x86_64)
+            - Windows: `.exe` (NSIS installer), `.msi`
+            - macOS: universal `.dmg`
+
+            Install:
+            - Debian/Ubuntu: `sudo apt install ./TMail_*.deb`
+            - Fedora/openSUSE: `sudo dnf install ./TMail-*.rpm` / `sudo zypper install ./TMail-*.rpm`
+            - AppImage: `chmod +x TMail_*.AppImage && ./TMail_*.AppImage`
+            - Windows: run the setup `.exe` or the `.msi`
+            - macOS: open the `.dmg` and drag TMail to Applications
+
+            These builds are **unsigned**. Review the source and the workflow
+            before installing. TMail is not affiliated with Tutao GmbH.
+
+            First start: sign in with a Tuta account (TOTP supported). The session
+            is stored in the OS keyring; the password is never stored.
+
+      - name: Write checksums
+        shell: bash
+        env:
+          BUNDLE_DIR: ${{ matrix.bundle_dir }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const crypto = require('crypto');
+          const root = process.env.BUNDLE_DIR;
+          const exts = ['.deb', '.rpm', '.AppImage', '.exe', '.msi', '.dmg'];
+          const files = [];
+          function walk(dir) {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) walk(full);
+              else if (exts.some((ext) => entry.name.endsWith(ext))) files.push(full);
+            }
+          }
+          walk(root);
+          const sums = files
+            .sort()
+            .map((file) => `${crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')}  ${path.relative(root, file)}`)
+            .join('\n');
+          fs.writeFileSync(`SHA256SUMS-${process.env.RUNNER_OS}.txt`, `${sums}\n`);
+          NODE
+
+      - name: Upload checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" "SHA256SUMS-${{ runner.os }}.txt" --clobber
