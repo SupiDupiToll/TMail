@@ -68,11 +68,17 @@ pub fn send_notification(
     state: State<'_, AppState>,
     title: String,
     body: String,
+    mail_id: Option<String>,
 ) -> ApiResult<()> {
     let _ = &state;
     let mut builder = app.notification().builder().title(title).body(body);
     if let Some(icon) = notification_icon(&app) {
         builder = builder.icon(icon);
+    }
+    if let Some(mail_id) = mail_id {
+        builder = builder
+            .action_type_id(crate::NOTIFICATION_ACTION_TYPE)
+            .extra("mail_id", mail_id);
     }
     builder
         .show()

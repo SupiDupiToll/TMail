@@ -211,8 +211,8 @@ export const api = {
   unreadCounts: () => invoke<{ folder_id: string; unread: number }[]>('unread_counts'),
   clearCache: () => invoke<void>('clear_cache'),
   quit: () => invoke<void>('quit_app'),
-  sendNotification: (title: string, body: string) =>
-    invoke<void>('send_notification', { title, body }),
+  sendNotification: (title: string, body: string, mailId?: string) =>
+    invoke<void>('send_notification', { title, body, mailId: mailId ?? null }),
   takePendingMailto: () => invoke<PendingMailto | null>('take_pending_mailto')
 };
 
@@ -220,6 +220,13 @@ export async function subscribeEvents(handler: (event: SyncEvent) => void): Prom
   if (!isTauri) return () => {};
   const { listen } = await import('@tauri-apps/api/event');
   const unlisten = await listen<SyncEvent>('sync-event', (event) => handler(event.payload));
+  return unlisten;
+}
+
+export async function subscribeOpenMail(handler: (mailId: string) => void): Promise<() => void> {
+  if (!isTauri) return () => {};
+  const { listen } = await import('@tauri-apps/api/event');
+  const unlisten = await listen<string>('open-mail', (event) => handler(event.payload));
   return unlisten;
 }
 
@@ -243,11 +250,11 @@ export async function openExternal(url: string): Promise<void> {
   }
 }
 
-export async function notify(title: string, body: string): Promise<void> {
+export async function notify(title: string, body: string, mailId?: string): Promise<void> {
   if (!isTauri) return;
   // Prefer the Rust command: it attaches the bundled TMail icon on Linux.
   try {
-    await api.sendNotification(title, body);
+    await api.sendNotification(title, body, mailId);
     return;
   } catch {
     /* fall back to the JS plugin below */

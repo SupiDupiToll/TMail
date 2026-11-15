@@ -13,9 +13,12 @@ use std::sync::Arc;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, WindowEvent};
+use tauri_plugin_notification::{Action, ActionType, NotificationExt};
 use tmail_core::CoreService;
 
 use commands::AppState;
+
+pub const NOTIFICATION_ACTION_TYPE: &str = "tmail-mail";
 
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -54,6 +57,7 @@ pub fn run() {
                     log::warn!("tray icon unavailable: {error}");
                 }
             }
+            register_notification_actions(app.handle());
             forward_events(app.handle().clone(), service);
 
             let args: Vec<String> = std::env::args().collect();
@@ -145,6 +149,34 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
         })
         .build(app)?;
     Ok(())
+}
+
+fn register_notification_actions(app: &tauri::AppHandle) {
+    let open = Action::builder("open", "Open email").build();
+    let action_type = ActionType::builder(NOTIFICATION_ACTION_TYPE)
+        .actions(vec![open])
+        .build();
+    if let Err(error) = app.notification().register_action_types(vec![action_type]) {
+        log::warn!("could not register notification actions: {error}");
+    }
+    let handle = app.clone();
+    if let Err(error) = app.notification().on_action(move |performed| {
+        if performed.action_id() == "dismiss" {
+            return;
+        }
+        commands::focus_main(&handle);
+        if let Some(notification) = performed.notification() {
+            if let Some(mail_id) = notification
+                .extra()
+                .get("mail_id")
+                .and_then(|value| value.as_str())
+            {
+                let _ = handle.emit("open-mail", mail_id.to_string());
+            }
+        }
+    }) {
+        log::warn!("could not register notification action handler: {error}");
+    }
 }
 
 fn forward_events(app: tauri::AppHandle, service: Arc<CoreService>) {

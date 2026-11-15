@@ -21,6 +21,8 @@ export interface SanitizedMail {
   srcdoc: string;
   /** Always the same; kept here so the component cannot drift. */
   sandbox: string;
+  /** Links extracted from the message, usable even if frame access is denied. */
+  links: { href: string; label: string }[];
 }
 
 const ALLOWED_TAGS = [
@@ -112,6 +114,7 @@ export function sanitizeMailHtml(html: string, options: SanitizeOptions): Saniti
     }
   }
 
+  const links = new Map<string, string>();
   // Links: keep the destination for our click handler, never let the frame
   // navigate. The trusted parent handles activation.
   for (const anchor of root.querySelectorAll('a')) {
@@ -127,6 +130,8 @@ export function sanitizeMailHtml(html: string, options: SanitizeOptions): Saniti
     anchor.setAttribute('tabindex', '0');
     anchor.removeAttribute('href');
     anchor.removeAttribute('target');
+    const label = (anchor.textContent ?? '').trim() || href;
+    if (!links.has(href)) links.set(href, label.slice(0, 120));
   }
 
   // Images: remote pixels are removed unless the user allowed this sender.
@@ -155,7 +160,7 @@ export function sanitizeMailHtml(html: string, options: SanitizeOptions): Saniti
     img.replaceWith(replacement);
   }
 
-  return wrap(root.innerHTML, options, emailCss);
+  return wrap(root.innerHTML, options, emailCss, Array.from(links, ([href, label]) => ({ href, label })));
 }
 
 const BLOCKED_PROPERTIES = new Set([
@@ -256,7 +261,12 @@ function sanitizeCss(css: string, declarationList = false): string {
   }
 }
 
-function wrap(body: string, options: SanitizeOptions, emailCss = ''): SanitizedMail {
+function wrap(
+  body: string,
+  options: SanitizeOptions,
+  emailCss = '',
+  links: { href: string; label: string }[] = []
+): SanitizedMail {
   const imgSrc = options.allowRemote ? 'data: https:' : 'data:';
   const csp = [
     "default-src 'none'",
@@ -326,7 +336,8 @@ ${emailCss ? `<style>${emailCss}</style>` : ''}
     // No allow-scripts: the document is inert. allow-same-origin lets the
     // trusted parent measure the body and intercept links; the document has
     // no script engine of its own and its CSP forbids scripts entirely.
-    sandbox: 'allow-same-origin'
+    sandbox: 'allow-same-origin',
+    links
   };
 }
 

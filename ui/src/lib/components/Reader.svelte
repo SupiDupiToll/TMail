@@ -63,15 +63,20 @@
       const request = parseMailto(href);
       if (request) app.openMailtoRequest(request);
     } else if (/^https?:/i.test(href)) {
-      void openExternal(href);
+      void openExternal(href).catch((error) =>
+        app.toast(`Could not open link: ${app.message(error)}`, 'error')
+      );
     }
   }
 
-  function attachFrame(): void {
+  function attachFrame(attempt = 0): void {
     if (!iframe) return;
     cleanupFrame();
     const doc = iframe.contentDocument;
-    if (!doc?.body) return;
+    if (!doc?.body) {
+      if (attempt < 10) setTimeout(() => attachFrame(attempt + 1), 40);
+      return;
+    }
 
     const measure = () => {
       const height = Math.max(
@@ -139,7 +144,11 @@
     cleanupFrame();
     bodyHeight = 320;
     hoveredLink = null;
-    return () => cleanupFrame();
+    const timer = setTimeout(() => attachFrame(), 0);
+    return () => {
+      clearTimeout(timer);
+      cleanupFrame();
+    };
   });
 
   function mailtoLabel(): string {
@@ -287,10 +296,21 @@
           sandbox={sanitized.sandbox}
           referrerpolicy="no-referrer"
           style:height={`${bodyHeight}px`}
-          onload={attachFrame}
+          onload={() => attachFrame()}
         ></iframe>
       {/if}
     </div>
+
+    {#if sanitized?.links.length}
+      <div class="link-strip" aria-label="Links in this message">
+        <span class="link-strip-label">Links</span>
+        {#each sanitized.links.slice(0, 10) as link (link.href)}
+          <button class="link-chip" title={link.href} onclick={() => handleLink(link.href)}>
+            {link.label}
+          </button>
+        {/each}
+      </div>
+    {/if}
 
     {#if visibleAttachments.length > 0}
       <section class="attachments" aria-label="Attachments">
@@ -466,6 +486,39 @@
     background: #ffffff;
     color-scheme: light;
     overflow: hidden;
+  }
+  .link-strip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    flex: none;
+    padding: 8px 28px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .link-strip-label {
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-right: 2px;
+  }
+  .link-chip {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 3px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+  .link-chip:hover {
+    background: color-mix(in srgb, var(--accent) 18%, var(--panel));
   }
   .attachments {
     flex: none;

@@ -1,4 +1,12 @@
-import { api, isMock, isTauri, notify, subscribeEvents, subscribeMailto } from './api';
+import {
+  api,
+  isMock,
+  isTauri,
+  notify,
+  subscribeEvents,
+  subscribeMailto,
+  subscribeOpenMail
+} from './api';
 import { splitAddresses } from './addresses';
 import { senderLabel } from './format';
 import type { AppInfo } from './api';
@@ -211,6 +219,7 @@ export class MailApp {
 
     this.unlisten.push(await subscribeEvents((event) => this.onSyncEvent(event)));
     this.unlisten.push(await subscribeMailto((request) => this.openMailto(request)));
+    this.unlisten.push(await subscribeOpenMail((mailId) => void this.openMailById(mailId)));
 
     if (isTauri) {
       try {
@@ -926,7 +935,8 @@ export class MailApp {
         const newest = fresh[0];
         void notify(
           senderLabel(newest.sender.name, newest.sender.address),
-          newest.subject
+          newest.subject,
+          newest.id
         );
       }
     } catch {
@@ -949,6 +959,15 @@ export class MailApp {
     } catch {
       return document.visibilityState !== 'visible' || !document.hasFocus();
     }
+  }
+
+  async openMailById(mailId: string): Promise<void> {
+    if (this.auth !== 'signed_in') return;
+    const inbox = this.snapshot?.folders.find((folder) => folder.kind === 'inbox');
+    if (inbox && this.selectedFolderId !== inbox.id) {
+      await this.selectFolder(inbox.id);
+    }
+    await this.openMail(mailId);
   }
 
   async openFromSearch(hit: SearchHit): Promise<void> {

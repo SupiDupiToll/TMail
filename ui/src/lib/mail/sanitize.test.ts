@@ -81,6 +81,14 @@ describe('sanitizeMailHtml', () => {
     expect(srcdoc).not.toContain('javascript:');
   });
 
+  it('exposes links for the parent link strip', () => {
+    const { links } = sanitizeMailHtml(
+      '<a href="https://example.com/x">Example</a><a href="https://example.com/x">Again</a>',
+      options
+    );
+    expect(links).toEqual([{ href: 'https://example.com/x', label: 'Example' }]);
+  });
+
   it('keeps data: images and table markup', () => {
     const { srcdoc } = sanitizeMailHtml(
       '<table><tr><td><img src="data:image/png;base64,AAAA" alt=""></td></tr></table>',

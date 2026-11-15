@@ -237,6 +237,15 @@ test('links are intercepted by the trusted parent, not navigated in-frame', asyn
     .poll(() => page.evaluate(() => (window as unknown as { __opened: string | null }).__opened))
     .toBe('https://example.com/verify');
   expect(page.url()).toContain('/?mock=inbox');
+
+  await page.evaluate(() => ((window as unknown as { __opened: string | null }).__opened = null));
+  await page
+    .locator('.link-strip')
+    .getByRole('button', { name: 'Manage this booking' })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __opened: string | null }).__opened))
+    .toBe('https://example.com/verify');
 });
 
 test('attachments preview in-app and close on the backdrop', async ({ page }) => {

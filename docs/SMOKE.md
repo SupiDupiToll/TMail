@@ -18,8 +18,10 @@ for now, run the desktop app with `TMAIL_API_URL=https://app.tuta.com`.
    table/CSS layout is preserved, remote pixel blocked, link opens the system
    browser after the preview, attachment downloads and decrypts, body height
    fits. Click a text/CSV attachment to preview it; click an image to preview
-   it; PDFs should offer Save. No timestamps or day separators appear in the
-   list, and the mail canvas stays readable in dark mode.
+   it; PDFs should offer Save. Click both an inline link and a link chip in the
+   "Links" strip; both should open the system browser. No timestamps or day
+   separators appear in the list, and the mail canvas stays readable in dark
+   mode.
 6. **Read state**: open an unread mail, wait 800 ms, verify unread clears; press
    Undo and verify it returns.
 7. **Compose**: choose a sender alias in From, send to the same account with
@@ -49,7 +51,8 @@ for now, run the desktop app with `TMAIL_API_URL=https://app.tuta.com`.
     default sender selected.
 16. **Tray/notify**: close the window (hides), restore from tray, quit; verify a
     new-mail notification while backgrounded. It must appear once, with the
-    TMail icon, sender and subject.
+    TMail icon, sender and subject, and an "Open email" button that opens the
+    message in TMail.
 17. **Scale/theme**: 1x, 1.5x, 2x; light/dark/system; 800×600 and 1920×1080.
 18. **Version guard**: use an outdated build and confirm the error says to
     update and does not delete the saved session.
