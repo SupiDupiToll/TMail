@@ -71,7 +71,7 @@ To build the host bundles locally:
 
 ```bash
 pnpm tauri build
-ls src-tauri/target/release/bundle/
+ls target/release/bundle/
 ```
 
 If RPM or AppImage tooling is missing, install the distribution packages for

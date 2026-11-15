@@ -178,7 +178,8 @@ pnpm install --frozen-lockfile
 pnpm tauri build
 ```
 
-Bundles are written below `src-tauri/target/release/bundle/`:
+Bundles are written below `target/release/bundle/` (macOS universal:
+`target/universal-apple-darwin/release/bundle/`):
 
 ```
 deb/       .deb package

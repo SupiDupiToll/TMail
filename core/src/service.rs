@@ -929,17 +929,13 @@ fn adjust_counters(active: &Active, folder_ids: &[String], delta: isize) {
     }
 }
 
-/// Default data directory following the XDG spec.
+/// Cross-platform per-user data directory (XDG on Linux, LOCALAPPDATA on
+/// Windows, Application Support on macOS).
 #[must_use]
 pub fn default_data_dir() -> PathBuf {
-    if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
-        if !xdg.is_empty() {
-            return PathBuf::from(xdg).join("tmail");
-        }
-    }
-    std::env::var("HOME")
-        .map(|home| PathBuf::from(home).join(".local/share/tmail"))
-        .unwrap_or_else(|_| PathBuf::from(".").join("tmail-data"))
+    dirs::data_local_dir()
+        .map(|dir| dir.join("tmail"))
+        .unwrap_or_else(|| PathBuf::from(".").join("tmail-data"))
 }
 
 /// Encodes an attachment for JSON transport to the UI. The UI receives bytes

@@ -101,10 +101,10 @@ pub trait SessionBackend: Send + Sync {
 
 /// Secret Service / KWallet on Linux, with the same code path on other
 /// platforms once a backend is added.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 pub struct KeyringBackend;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 impl SessionBackend for KeyringBackend {
     fn load(&self, account: &str) -> Result<Option<String>> {
         let entry = keyring::Entry::new(SERVICE, account).map_err(|e| {
