@@ -34,6 +34,12 @@ pub enum SyncEvent {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
+pub struct RecipientKind {
+    pub address: String,
+    pub internal: bool,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct FolderUnread {
     pub folder_id: String,
     pub unread: usize,
@@ -271,6 +277,15 @@ impl CoreService {
             let _ = std::fs::remove_dir_all(self.cache_dir(&email));
         }
         Ok(())
+    }
+
+    pub async fn classify_recipients(&self, addresses: Vec<String>) -> Result<Vec<RecipientKind>> {
+        let active = self.active()?;
+        let kinds = crate::send::classify_recipients(&active.sdk, &addresses).await?;
+        Ok(kinds
+            .into_iter()
+            .map(|(address, internal)| RecipientKind { address, internal })
+            .collect())
     }
 
     pub fn folder_tree(&self) -> Result<Vec<FolderNode>> {

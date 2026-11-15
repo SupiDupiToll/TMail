@@ -122,6 +122,18 @@ pub async fn logout(state: State<'_, AppState>) -> ApiResult<()> {
 }
 
 #[tauri::command]
+pub async fn classify_recipients(
+    state: State<'_, AppState>,
+    addresses: Vec<String>,
+) -> ApiResult<Vec<tmail_core::service::RecipientKind>> {
+    state
+        .service
+        .classify_recipients(addresses)
+        .await
+        .map_err(ApiError::from)
+}
+
+#[tauri::command]
 pub async fn list_folders(
     state: State<'_, AppState>,
 ) -> ApiResult<Vec<tmail_core::folders::FolderNode>> {

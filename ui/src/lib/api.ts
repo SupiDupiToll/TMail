@@ -54,6 +54,13 @@ function mockInvoke(command: string, args?: Record<string, unknown>): unknown {
       return mock.snapshot();
     case 'list_folders':
       return mock.snapshot().folders;
+    case 'classify_recipients': {
+      const addresses = (args?.addresses as string[] | undefined) ?? [];
+      return addresses.map((address) => ({
+        address,
+        internal: /\@(tuta\.com|tutanota\.com|tuta\.io|tutanota\.de)$/i.test(address)
+      }));
+    }
     case 'open_folder':
       return mock.folder(String(args?.folderId), Number(args?.limit ?? 200));
     case 'refresh_folder':
@@ -146,6 +153,11 @@ export interface SaveAttachmentResult {
   path?: string;
 }
 
+export interface RecipientKind {
+  address: string;
+  internal: boolean;
+}
+
 export interface AttachmentData {
   name: string;
   mime_type: string;
@@ -162,6 +174,8 @@ export const api = {
   snapshot: () => invoke<Snapshot>('snapshot'),
   logout: () => invoke<void>('logout'),
   listFolders: () => invoke<FolderNode[]>('list_folders'),
+  classifyRecipients: (addresses: string[]) =>
+    invoke<RecipientKind[]>('classify_recipients', { addresses }),
   openFolder: (folderId: string, limit = 200) =>
     invoke<MailSummary[]>('open_folder', { folderId, limit }),
   refreshFolder: (folderId: string, limit = 200) =>

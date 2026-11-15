@@ -337,6 +337,30 @@ impl AsymmetricCryptoFacade {
             .await
     }
 
+    /// Whether the address has a Tuta public key. Custom domains hosted by Tuta
+    /// answer yes; ordinary external addresses answer no. A transport failure is
+    /// an error, never a silent "external" decision.
+    pub async fn has_public_key_for_mail_address(
+        &self,
+        mail_address: &str,
+    ) -> Result<bool, AsymmetricCryptoError> {
+        let identifier = PublicKeyIdentifier {
+            identifier: mail_address.trim().to_lowercase(),
+            identifier_type: PublicKeyIdentifierType::MailAddress,
+        };
+        match self
+            .public_key_provider
+            .load_current_pub_key(&identifier)
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(PublicKeyLoadingError::KeyLoadingError(ApiCallError::ServerResponseError {
+                source: crate::rest_error::HttpError::NotFoundError,
+            })) => Ok(false),
+            Err(error) => Err(error.into()),
+        }
+    }
+
     /// Encrypts the symKey asymmetrically with the provided public keys using the TutaCrypt protocol.
     /// @param symKey the key to be encrypted
     /// @param recipientPublicKeys MUST be a tuta_crypt key pair

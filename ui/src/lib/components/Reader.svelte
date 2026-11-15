@@ -460,9 +460,12 @@
     display: block;
     width: 100%;
     max-width: 100%;
+    margin: 0 auto;
     border: 0;
-    background: transparent;
-    color-scheme: light dark;
+    border-radius: var(--radius-md);
+    background: #ffffff;
+    color-scheme: light;
+    overflow: hidden;
   }
   .attachments {
     flex: none;

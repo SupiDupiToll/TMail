@@ -14,7 +14,7 @@ Done.
 
 ## Phase 1 — Core crate
 
-Done and unit-tested (59 tests):
+Done and unit-tested (58 tests):
 
 - Vendored, patched SDK at `tutanota-release-362.261020.0`; upstream + our
   tests pass. Patch stack documented in `vendor/tuta/PATCHES.md`.
@@ -25,6 +25,9 @@ Done and unit-tested (59 tests):
   updates (persisted in `meta`), optimistic local counter adjustments.
 - Sender aliases: `GroupInfo.mailAddress` + enabled aliases, validated before
   send, selectable in the composer.
+- Recipient classification: known Tuta domains are a fast path; custom domains
+  hosted by Tuta are detected through the public-key service. A lookup failure
+  aborts rather than silently downgrading encryption.
 - Sending: non-confidential mail, plus automatic end-to-end encryption for
   Tuta recipients (recipient key data via the public-key provider, RSA and
   TutaCrypt); sender group identity is used for TutaCrypt.

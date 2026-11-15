@@ -82,6 +82,17 @@ impl CryptoFacade {
         &self.key_loader_facade
     }
 
+    /// Whether a recipient address is a Tuta account (including custom
+    /// domains hosted by Tuta), based on the public-key service.
+    pub async fn has_public_key_for_recipient(
+        &self,
+        mail_address: &str,
+    ) -> Result<bool, AsymmetricCryptoError> {
+        self.asymmetric_crypto_facade
+            .has_public_key_for_mail_address(mail_address)
+            .await
+    }
+
     /// Encrypts a bucket key for a recipient mail address, using the current
     /// public key (RSA or TutaCrypt) returned by the public-key service.
     pub async fn encrypt_bucket_key_for_recipient(

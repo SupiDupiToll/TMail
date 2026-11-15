@@ -31,6 +31,7 @@ rsync -a --exclude uniffi-bindgen tuta-sdk/ /path/to/TMail/vendor/tuta/tuta-sdk/
 | 12 | bucket instance keys | Resolve attachment keys from a mail's bucket | internal |
 | 13 | android logger | Honour the logging feature before installing Android logger | internal |
 | 14 | send recipient keys | Expose encryption of a send bucket key for internal recipients through the existing public-key provider (RSA and TutaCrypt) | internal |
+| 15 | custom domain detection | Ask the public-key service whether an address belongs to a Tuta account, including Tuta-hosted custom domains | internal |
 
 We do **not** submit these to tutao/tutanota: upstream rejects AI-assisted
 contributions. If a patch is independently rewritten and accepted upstream, it

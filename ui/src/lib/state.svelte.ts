@@ -173,6 +173,9 @@ export class MailApp {
 
   private toastSeq = 0;
   private media: MediaQueryList | null = null;
+  private inboxKnownIds = new Set<string>();
+  private inboxTimer: ReturnType<typeof setInterval> | null = null;
+  private inboxCheckInFlight = false;
   private readTimer: ReturnType<typeof setTimeout> | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private unlisten: Array<() => void> = [];
@@ -218,6 +221,7 @@ export class MailApp {
       }
     }
 
+    this.startInboxWatch();
     const lastEmail = getString('tmail.last-email') || (isMock ? 'you@tuta.com' : '');
     if (lastEmail) {
       try {
@@ -254,6 +258,7 @@ export class MailApp {
           if (this.auth === 'signed_in' && this.selectedFolderId) {
             void this.refreshCurrent(true);
           }
+          void this.checkInboxForNewMail();
         }, 350);
         break;
     }
@@ -338,6 +343,7 @@ export class MailApp {
       };
     }
     if (target) void this.selectFolder(target.id);
+    void this.checkInboxForNewMail();
   }
 
   async logout(): Promise<void> {
@@ -349,6 +355,7 @@ export class MailApp {
       this.detail = null;
       this.selectedMailId = null;
       this.selectedFolderId = '';
+      this.inboxKnownIds.clear();
       this.auth = 'signed_out';
       this.composer = emptyComposer();
     }
@@ -889,13 +896,53 @@ export class MailApp {
     setString('tmail.remote-senders', JSON.stringify(this.remoteSenders));
   }
 
+  private startInboxWatch(): void {
+    if (this.inboxTimer) clearInterval(this.inboxTimer);
+    // Event-bus delivery is the fast path; this is the safety net for missed
+    // counter batches and for the first run after a reconnect.
+    this.inboxTimer = setInterval(() => {
+      if (this.auth === 'signed_in') void this.checkInboxForNewMail();
+    }, 60_000);
+  }
+
+  private async checkInboxForNewMail(): Promise<void> {
+    if (this.inboxCheckInFlight || this.auth !== 'signed_in') return;
+    const inbox = this.snapshot?.folders.find((folder) => folder.kind === 'inbox');
+    if (!inbox) return;
+    this.inboxCheckInFlight = true;
+    const firstRun = this.inboxKnownIds.size === 0;
+    try {
+      const mails = await api.refreshFolder(inbox.id, 80);
+      const fresh = mails.filter(
+        (mail) => mail.unread && !this.inboxKnownIds.has(mail.id)
+      );
+      for (const mail of mails) this.inboxKnownIds.add(mail.id);
+      if (!firstRun && fresh.length > 0 && this.notificationsEnabled && (await this.isWindowHidden())) {
+        const newest = fresh[0];
+        void notify(
+          senderLabel(newest.sender.name, newest.sender.address),
+          newest.subject
+        );
+      }
+    } catch {
+      // Offline or session expired; the next event or poll retries.
+    } finally {
+      this.inboxCheckInFlight = false;
+    }
+  }
+
   private async isWindowHidden(): Promise<boolean> {
-    if (!isTauri) return document.visibilityState !== 'visible';
+    if (!isTauri) {
+      return document.visibilityState !== 'visible' || !document.hasFocus();
+    }
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      return !(await getCurrentWindow().isVisible());
+      const window = getCurrentWindow();
+      // A visible window on another workspace is still "visible" to the OS;
+      // focus is the signal users expect for desktop notifications.
+      return !(await window.isVisible()) || !(await window.isFocused());
     } catch {
-      return document.visibilityState !== 'visible';
+      return document.visibilityState !== 'visible' || !document.hasFocus();
     }
   }
 
@@ -950,6 +997,8 @@ export class MailApp {
     this.unlisten = [];
     this.media?.removeEventListener('change', this.onSystemTheme);
     this.media = null;
+    if (this.inboxTimer) clearInterval(this.inboxTimer);
+    this.inboxTimer = null;
   }
 }
 

@@ -72,27 +72,61 @@ fn is_tuta_address(address: &str) -> bool {
         .any(|domain| address.ends_with(domain))
 }
 
-fn all_tuta(outgoing: &Outgoing) -> bool {
-    let addresses = outgoing.to.iter().chain(&outgoing.cc).chain(&outgoing.bcc);
-    let mut any = false;
-    for address in addresses {
-        any = true;
-        if !is_tuta_address(address) {
-            return false;
-        }
-    }
-    any
+fn all_recipients(outgoing: &Outgoing) -> Vec<String> {
+    outgoing
+        .to
+        .iter()
+        .chain(&outgoing.cc)
+        .chain(&outgoing.bcc)
+        .map(|address| address.trim().to_ascii_lowercase())
+        .collect()
 }
 
-fn effective_confidential(outgoing: &Outgoing) -> bool {
-    outgoing.confidential || all_tuta(outgoing)
+/// Classifies every recipient as a Tuta account or external. Known Tuta
+/// domains are a fast path; other domains are checked through the public-key
+/// service, which also recognises Tuta-hosted custom domains. A network error
+/// aborts instead of silently downgrading encryption.
+pub async fn classify_recipients(
+    sdk: &Arc<LoggedInSdk>,
+    addresses: &[String],
+) -> Result<Vec<(String, bool)>> {
+    let crypto_client = sdk.mail_facade().get_crypto_entity_client();
+    let crypto = crypto_client.get_crypto_facade();
+    let mut out = Vec::with_capacity(addresses.len());
+    for address in addresses {
+        let normalised = address.trim().to_ascii_lowercase();
+        if normalised.is_empty() {
+            continue;
+        }
+        if is_tuta_address(&normalised) {
+            out.push((normalised, true));
+            continue;
+        }
+        let internal = crypto
+            .has_public_key_for_recipient(&normalised)
+            .await
+            .map_err(|error| {
+                CoreError::Protocol(format!(
+                    "could not check whether {normalised} is a Tuta account: {error}"
+                ))
+            })?;
+        out.push((normalised, internal));
+    }
+    Ok(out)
 }
 
 /// Creates a draft and immediately submits it for sending.
 pub async fn send(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<(String, String)> {
     validate(outgoing)?;
     let randomizer = RandomizerFacade::from_core(rand_core::OsRng);
-    let confidential = effective_confidential(outgoing);
+    let kinds = classify_recipients(sdk, &all_recipients(outgoing)).await?;
+    let has_external = kinds.iter().any(|(_, internal)| !internal);
+    if outgoing.confidential && has_external {
+        return Err(CoreError::InvalidInput(
+            "password-protected mail to external recipients is not available yet".into(),
+        ));
+    }
+    let confidential = !has_external && !kinds.is_empty();
     let draft = create_draft(sdk, outgoing, confidential, &randomizer).await?;
 
     let bucket_key: Option<GenericAesKey> = if confidential {
@@ -225,7 +259,9 @@ pub async fn send(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<(String
 pub async fn save_draft(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<String> {
     validate(outgoing)?;
     let randomizer = RandomizerFacade::from_core(rand_core::OsRng);
-    let draft = create_draft(sdk, outgoing, effective_confidential(outgoing), &randomizer).await?;
+    let kinds = classify_recipients(sdk, &all_recipients(outgoing)).await?;
+    let confidential = !kinds.is_empty() && kinds.iter().all(|(_, internal)| *internal);
+    let draft = create_draft(sdk, outgoing, confidential, &randomizer).await?;
     Ok(format!("{}/{}", draft.id.list_id.0, draft.id.element_id.0))
 }
 
@@ -245,13 +281,6 @@ fn validate(outgoing: &Outgoing) -> Result<()> {
     {
         return Err(CoreError::InvalidInput(
             "check the recipient addresses".into(),
-        ));
-    }
-    if outgoing.confidential && !all_tuta(outgoing) {
-        // The external-group/Bcrypt flow is not exposed by the SDK yet. Refuse
-        // before a draft is created so nothing is left behind on the server.
-        return Err(CoreError::InvalidInput(
-            "password-protected mail to external recipients is not available yet".into(),
         ));
     }
     Ok(())
@@ -573,24 +602,9 @@ mod tests {
     }
 
     #[test]
-    fn external_confidential_is_refused_before_creating_a_draft() {
-        let mut mail = outgoing();
-        mail.confidential = true;
-        assert!(validate(&mail).is_err());
-        mail.confidential_password = Some("correct horse battery staple".into());
-        assert!(validate(&mail).is_err());
-        mail.to = vec!["friend@tuta.com".into()];
-        assert!(validate(&mail).is_ok());
-    }
-
-    #[test]
-    fn tuta_recipients_are_always_confidential() {
-        let mut mail = outgoing();
-        mail.to = vec!["friend@tuta.com".into()];
-        assert!(effective_confidential(&mail));
-        mail.to = vec!["friend@example.com".into()];
-        assert!(!effective_confidential(&mail));
-        mail.confidential = true;
-        assert!(effective_confidential(&mail));
+    fn recognises_known_tuta_domains_and_rejects_external_ones() {
+        assert!(is_tuta_address("a@tuta.com"));
+        assert!(is_tuta_address("a@tutanota.de"));
+        assert!(!is_tuta_address("a@example.com"));
     }
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from '../state.svelte';
-  import { api, notify } from '../api';
+  import { api, notify, openExternal } from '../api';
   import type { ThemePreference, Density } from '../state.svelte';
   import Icon from './Icon.svelte';
 
@@ -248,9 +248,12 @@
             {app.snapshot?.session_persisted ? 'Keyring' : 'Memory'}
           </span>
         </div>
-        <p class="server-note">
-          Server-side rules, vacation replies and templates are still managed in Tuta web.
-        </p>
+        <div class="server-note">
+          <p>Server-side rules, vacation replies and templates are still managed in Tuta web.</p>
+          <button class="btn btn-sm" onclick={() => openExternal('https://app.tuta.com')}>
+            Open Tuta web
+          </button>
+        </div>
       </section>
 
       <section class="group" aria-labelledby="about-label">
@@ -460,6 +463,9 @@
     background: var(--accent-soft);
   }
   .server-note {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin: 6px 0 2px;
     padding: 8px 10px;
     border-radius: var(--radius-xs);
@@ -467,6 +473,12 @@
     color: var(--faint);
     font-size: 10.5px;
     line-height: 1.45;
+  }
+  .server-note p {
+    flex: 1;
+  }
+  .server-note button {
+    flex: none;
   }
   .about {
     display: flex;

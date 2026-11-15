@@ -95,7 +95,10 @@ protected external mail.
 - Safe mail CSS and legacy markup are preserved, so real mail looks like mail
   rather than a flattened text export; the mail canvas stays light for contrast.
 - Remote content is blocked with a concrete, per-sender decision; the mail frame
-  is script-free and its CSS is filtered for resource loads and fixed positioning.
+  is script-free, rounded and its CSS is filtered for resource loads and fixed
+  positioning.
+- New-mail detection has an event-bus fast path and an Inbox poll as a safety
+  net; notifications respect focus/hidden state.
 - Keyboard flow (`j/k`, `Enter`, `u/e/#`, `r/a/f`, `Ctrl+K`, `g` sequences) is
   coherent and discoverable through the palette and help sheet.
 - The encrypted-cache/session/keyring story is visible in settings and errors,
@@ -107,7 +110,7 @@ protected external mail.
 - `pnpm -C ui exec playwright test`: 28 passed, 1 skipped (screenshots).
 - `impeccable detect --json ui/src`: 0 findings.
 - `pnpm -C ui test`: 13 passed (sanitiser and formatting).
-- `cargo test -p tmail-core`: 59 passed.
+- `cargo test -p tmail-core`: 58 passed.
 - `cargo test -p tmail-desktop`: 3 passed (mailto parser).
 - Screenshots in `docs/review-shots/` (14: light/dark inbox, reader, composer,
   palette, settings, login, mobile). **Agents must not open them; the owner

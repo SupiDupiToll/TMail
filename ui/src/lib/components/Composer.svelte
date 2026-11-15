@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../state.svelte';
+  import { api } from '../api';
   import { formatBytes } from '../format';
   import { isTutaAddress, splitAddresses } from '../addresses';
   import Icon from './Icon.svelte';
@@ -22,8 +23,58 @@
     ...splitAddresses(composer.cc),
     ...splitAddresses(composer.bcc)
   ]);
-  const externalRecipients = $derived(recipients.filter((address) => !isTutaAddress(address)));
-  const allTuta = $derived(recipients.length > 0 && externalRecipients.length === 0);
+  let recipientKinds = $state<Record<string, boolean>>({});
+  let checkingRecipients = $state(false);
+  let checkFailed = $state(false);
+
+  const lookupKey = $derived(
+    recipients
+      .filter((address) => !isTutaAddress(address))
+      .map((address) => address.toLowerCase())
+      .filter((address, index, all) => all.indexOf(address) === index)
+      .join('|')
+  );
+
+  const externalRecipients = $derived(
+    recipients.filter(
+      (address) =>
+        !isTutaAddress(address) && recipientKinds[address.toLowerCase()] === false
+    )
+  );
+  const unknownRecipients = $derived(
+    recipients.filter(
+      (address) =>
+        !isTutaAddress(address) && recipientKinds[address.toLowerCase()] === undefined
+    )
+  );
+  const allTuta = $derived(
+    recipients.length > 0 && externalRecipients.length === 0 && unknownRecipients.length === 0
+  );
+
+  $effect(() => {
+    const key = lookupKey;
+    if (!key) {
+      checkingRecipients = false;
+      checkFailed = false;
+      return;
+    }
+    checkingRecipients = true;
+    checkFailed = false;
+    const timer = setTimeout(async () => {
+      try {
+        const kinds = await api.classifyRecipients(key.split('|'));
+        recipientKinds = {
+          ...recipientKinds,
+          ...Object.fromEntries(kinds.map((kind) => [kind.address.toLowerCase(), kind.internal]))
+        };
+      } catch {
+        checkFailed = true;
+      } finally {
+        checkingRecipients = false;
+      }
+    }, 220);
+    return () => clearTimeout(timer);
+  });
 
   $effect(() => {
     if (composer.open && dialog && !dialog.open) {
@@ -152,6 +203,16 @@
           <Icon name="eye" size={13} />
           Not encrypted
         </span>
+      {:else if checkingRecipients}
+        <span class="crypto-chip off" title="Checking recipient domains against Tuta.">
+          <span class="spinner tiny-spinner"></span>
+          Checking
+        </span>
+      {:else if checkFailed}
+        <span class="crypto-chip off" title="Could not verify recipient encryption; sending will retry.">
+          <Icon name="eye" size={13} />
+          Unknown
+        </span>
       {/if}
       <div class="head-actions">
         <button class="btn btn-sm btn-ghost" onclick={() => app.saveDraft()} disabled={composer.busy}>
@@ -223,6 +284,11 @@
       <p class="crypto-note">
         <Icon name="eye" size={13} />
         External recipients receive this without end-to-end encryption. Password-protected external mail is not available yet.
+      </p>
+    {:else if checkFailed}
+      <p class="crypto-note">
+        <Icon name="eye" size={13} />
+        Could not verify recipient encryption. TMail will check again before sending.
       </p>
     {/if}
 
@@ -377,6 +443,11 @@
   .crypto-chip.off {
     background: var(--panel-2);
     color: var(--muted);
+  }
+  .tiny-spinner {
+    width: 11px;
+    height: 11px;
+    border-width: 1.5px;
   }
   .head-actions {
     display: flex;

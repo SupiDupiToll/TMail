@@ -1,0 +1,57 @@
+diff --git a/tuta-sdk/rust/sdk/src/crypto/asymmetric_crypto_facade.rs b/tuta-sdk/rust/sdk/src/crypto/asymmetric_crypto_facade.rs
+index 101459d..ae6e7ce 100644
+--- a/tuta-sdk/rust/sdk/src/crypto/asymmetric_crypto_facade.rs
++++ b/tuta-sdk/rust/sdk/src/crypto/asymmetric_crypto_facade.rs
+@@ -337,6 +337,30 @@ impl AsymmetricCryptoFacade {
+             .await
+     }
+ 
++    /// Whether the address has a Tuta public key. Custom domains hosted by Tuta
++    /// answer yes; ordinary external addresses answer no. A transport failure is
++    /// an error, never a silent "external" decision.
++    pub async fn has_public_key_for_mail_address(
++        &self,
++        mail_address: &str,
++    ) -> Result<bool, AsymmetricCryptoError> {
++        let identifier = PublicKeyIdentifier {
++            identifier: mail_address.trim().to_lowercase(),
++            identifier_type: PublicKeyIdentifierType::MailAddress,
++        };
++        match self
++            .public_key_provider
++            .load_current_pub_key(&identifier)
++            .await
++        {
++            Ok(_) => Ok(true),
++            Err(PublicKeyLoadingError::KeyLoadingError(ApiCallError::ServerResponseError {
++                source: crate::rest_error::HttpError::NotFoundError,
++            })) => Ok(false),
++            Err(error) => Err(error.into()),
++        }
++    }
++
+     /// Encrypts the symKey asymmetrically with the provided public keys using the TutaCrypt protocol.
+     /// @param symKey the key to be encrypted
+     /// @param recipientPublicKeys MUST be a tuta_crypt key pair
+diff --git a/tuta-sdk/rust/sdk/src/crypto/crypto_facade.rs b/tuta-sdk/rust/sdk/src/crypto/crypto_facade.rs
+index a1b1432..54c727f 100644
+--- a/tuta-sdk/rust/sdk/src/crypto/crypto_facade.rs
++++ b/tuta-sdk/rust/sdk/src/crypto/crypto_facade.rs
+@@ -82,6 +82,17 @@ impl CryptoFacade {
+         &self.key_loader_facade
+     }
+ 
++    /// Whether a recipient address is a Tuta account (including custom
++    /// domains hosted by Tuta), based on the public-key service.
++    pub async fn has_public_key_for_recipient(
++        &self,
++        mail_address: &str,
++    ) -> Result<bool, AsymmetricCryptoError> {
++        self.asymmetric_crypto_facade
++            .has_public_key_for_mail_address(mail_address)
++            .await
++    }
++
+     /// Encrypts a bucket key for a recipient mail address, using the current
+     /// public key (RSA or TutaCrypt) returned by the public-key service.
+     pub async fn encrypt_bucket_key_for_recipient(

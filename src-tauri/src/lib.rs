@@ -81,6 +81,7 @@ pub fn run() {
             commands::snapshot,
             commands::logout,
             commands::list_folders,
+            commands::classify_recipients,
             commands::unread_counts,
             commands::open_folder,
             commands::refresh_folder,

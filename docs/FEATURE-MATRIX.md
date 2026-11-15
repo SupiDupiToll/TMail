@@ -50,3 +50,4 @@ deliberately out of scope.
 | Security | Encrypted cache | **MVP** | SQLCipher |
 | Security | No telemetry | **MVP** | asserted by dependency/network review |
 | Security | HTML sandbox + CSP | **MVP** | ADR 0007 |
+| Security | Custom-domain Tuta recipient detection | **MVP** | public-key service, no silent downgrade |
