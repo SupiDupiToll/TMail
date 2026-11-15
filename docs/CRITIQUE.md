@@ -98,7 +98,8 @@ protected external mail.
   is script-free, rounded and its CSS is filtered for resource loads and fixed
   positioning.
 - New-mail detection has an event-bus fast path and an Inbox poll as a safety
-  net; notifications respect focus/hidden state.
+  net; notifications respect focus/hidden state, appear once and carry the
+  TMail icon.
 - Keyboard flow (`j/k`, `Enter`, `u/e/#`, `r/a/f`, `Ctrl+K`, `g` sequences) is
   coherent and discoverable through the palette and help sheet.
 - The encrypted-cache/session/keyring story is visible in settings and errors,

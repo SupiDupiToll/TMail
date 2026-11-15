@@ -396,15 +396,6 @@ export class MailApp {
       const counts = await api.unreadCounts();
       if (this.snapshot) this.snapshot = { ...this.snapshot, unread: counts };
       const total = counts.reduce((sum, entry) => sum + entry.unread, 0);
-      if (total > this.unreadTotal && this.notificationsEnabled && (await this.isWindowHidden())) {
-        const fresh = mails.find(
-          (mail) => mail.unread && !this.mails.some((known) => known.id === mail.id)
-        );
-        void notify(
-          fresh ? senderLabel(fresh.sender.name, fresh.sender.address) : 'New mail',
-          fresh ? fresh.subject : 'You have new messages in TMail.'
-        );
-      }
       this.unreadTotal = total;
       this.connection = 'online';
     } catch (error) {

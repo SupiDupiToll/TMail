@@ -4,6 +4,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 use tmail_core::models::{DraftInput, MailDetail, MailSummary, SearchHit};
 use tmail_core::service::{IncomingAttachment, Snapshot};
@@ -48,6 +49,34 @@ pub struct AppInfo {
     product: String,
     api_url: String,
     mock: bool,
+}
+
+fn notification_icon(app: &AppHandle) -> Option<String> {
+    let dir = app.path().app_cache_dir().ok()?;
+    std::fs::create_dir_all(&dir).ok()?;
+    let path = dir.join("notification-icon.png");
+    const ICON: &[u8] = include_bytes!("../icons/128x128.png");
+    if std::fs::read(&path).ok().as_deref() != Some(ICON) {
+        std::fs::write(&path, ICON).ok()?;
+    }
+    Some(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+pub fn send_notification(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    title: String,
+    body: String,
+) -> ApiResult<()> {
+    let _ = &state;
+    let mut builder = app.notification().builder().title(title).body(body);
+    if let Some(icon) = notification_icon(&app) {
+        builder = builder.icon(icon);
+    }
+    builder
+        .show()
+        .map_err(|error| ApiError::from(format!("notification failed: {error}")))
 }
 
 #[tauri::command]

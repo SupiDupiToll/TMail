@@ -48,7 +48,8 @@ for now, run the desktop app with `TMAIL_API_URL=https://app.tuta.com`.
     TMail running and stopped; verify the composer opens both times with the
     default sender selected.
 16. **Tray/notify**: close the window (hides), restore from tray, quit; verify a
-    new-mail notification while backgrounded.
+    new-mail notification while backgrounded. It must appear once, with the
+    TMail icon, sender and subject.
 17. **Scale/theme**: 1x, 1.5x, 2x; light/dark/system; 800×600 and 1920×1080.
 18. **Version guard**: use an outdated build and confirm the error says to
     update and does not delete the saved session.

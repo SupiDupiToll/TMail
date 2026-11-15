@@ -203,6 +203,8 @@ export const api = {
   unreadCounts: () => invoke<{ folder_id: string; unread: number }[]>('unread_counts'),
   clearCache: () => invoke<void>('clear_cache'),
   quit: () => invoke<void>('quit_app'),
+  sendNotification: (title: string, body: string) =>
+    invoke<void>('send_notification', { title, body }),
   takePendingMailto: () => invoke<PendingMailto | null>('take_pending_mailto')
 };
 
@@ -235,6 +237,13 @@ export async function openExternal(url: string): Promise<void> {
 
 export async function notify(title: string, body: string): Promise<void> {
   if (!isTauri) return;
+  // Prefer the Rust command: it attaches the bundled TMail icon on Linux.
+  try {
+    await api.sendNotification(title, body);
+    return;
+  } catch {
+    /* fall back to the JS plugin below */
+  }
   try {
     const plugin = await import('@tauri-apps/plugin-notification');
     let granted = await plugin.isPermissionGranted();

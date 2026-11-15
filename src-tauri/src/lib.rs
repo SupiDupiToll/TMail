@@ -82,6 +82,7 @@ pub fn run() {
             commands::logout,
             commands::list_folders,
             commands::classify_recipients,
+            commands::send_notification,
             commands::unread_counts,
             commands::open_folder,
             commands::refresh_folder,
