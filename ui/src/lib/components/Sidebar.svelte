@@ -35,25 +35,22 @@
     <Avatar name={app.snapshot?.email ?? 'TMail'} address={app.snapshot?.email ?? 'tmail'} size={36} />
     <div class="account-text">
       <span class="account-email" title={app.snapshot?.email ?? ''}>{app.snapshot?.email ?? 'Not signed in'}</span>
-      <span class="account-state">
-        <span
-          class="dot"
-          class:online={app.connection === 'online'}
-          class:offline={app.connection === 'offline'}
-          title={app.connection === 'online' ? 'Connected' : app.connection === 'offline' ? 'Offline' : 'Connecting'}
-        ></span>
-        {#if app.synthetic}<span class="synthetic">preview</span>{/if}
-      </span>
+      {#if app.synthetic}<span class="synthetic">preview</span>{/if}
     </div>
-    <button class="icon-btn" aria-label="Settings" title="Settings" onclick={() => (app.settingsOpen = true)}>
+    <button class="icon-btn settings-btn" aria-label="Settings" title="Settings" onclick={() => (app.settingsOpen = true)}>
       <Icon name="settings" size={17} />
     </button>
   </div>
 
   <div class="compose-wrap">
-    <button class="compose" onclick={() => app.compose('new')}>
+    <button
+      class="compose"
+      aria-label={app.sidebarCollapsed ? 'Compose new message' : undefined}
+      title="Compose (c)"
+      onclick={() => app.compose('new')}
+    >
       <Icon name="compose" size={16} />
-      <span>Compose</span>
+      <span class="compose-label">Compose</span>
       <kbd class="kbd">c</kbd>
     </button>
   </div>
@@ -63,6 +60,8 @@
       <button
         class="folder"
         class:active={app.selectedFolderId === folder.id}
+        aria-label={app.sidebarCollapsed ? label(folder) : undefined}
+        title={label(folder)}
         aria-current={app.selectedFolderId === folder.id ? 'page' : undefined}
         onclick={() => select(folder)}
       >
@@ -81,6 +80,8 @@
           class="folder custom"
           class:active={app.selectedFolderId === folder.id}
           style:padding-left={`${12 + folder.level * 15}px`}
+          aria-label={app.sidebarCollapsed ? folder.name : undefined}
+          title={folder.name}
           aria-current={app.selectedFolderId === folder.id ? 'page' : undefined}
           onclick={() => select(folder)}
         >
@@ -95,14 +96,19 @@
   </nav>
 
   <div class="sidebar-foot">
-    <button class="foot-action" onclick={() => (app.helpOpen = true)}>
+    <button class="foot-action shortcuts" onclick={() => (app.helpOpen = true)} title="Keyboard shortcuts">
       <span class="kbd">?</span>
-      <span>Shortcuts</span>
+      <span class="foot-label">Shortcuts</span>
     </button>
-    <span class="secure" title="Local cache is encrypted">
-      <Icon name="shield" size={13} />
-      Encrypted
-    </span>
+    <button
+      class="foot-action collapse"
+      aria-label={app.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      title={app.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      onclick={() => app.toggleSidebar()}
+    >
+      <Icon name={app.sidebarCollapsed ? 'chevron' : 'chevron-left'} size={15} />
+      <span class="foot-label">{app.sidebarCollapsed ? 'Expand' : 'Collapse'}</span>
+    </button>
   </div>
 </aside>
 
@@ -139,28 +145,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .account-state {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 10.5px;
-    color: var(--faint);
-    min-height: 14px;
-  }
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--faint);
-  }
-  .dot.online {
-    background: var(--accent);
-  }
-  .dot.offline {
-    background: var(--brass);
-  }
   .synthetic {
-    margin-left: 2px;
+    align-self: flex-start;
     padding: 0 5px;
     border-radius: var(--radius-pill);
     background: var(--brass-soft);
@@ -283,13 +269,51 @@
     background: var(--hover-bg);
     color: var(--text);
   }
-  .secure {
-    display: flex;
-    align-items: center;
+
+  /* Icon-only state. The width itself comes from the shell's CSS variable. */
+  :global([data-sidebar='collapsed']) .sidebar {
+    padding: 0 8px;
+  }
+  :global([data-sidebar='collapsed']) .account {
+    justify-content: center;
+    padding: 12px 0 10px;
+  }
+  :global([data-sidebar='collapsed']) .account-text,
+  :global([data-sidebar='collapsed']) .settings-btn,
+  :global([data-sidebar='collapsed']) .compose-label,
+  :global([data-sidebar='collapsed']) .compose .kbd,
+  :global([data-sidebar='collapsed']) .folder-name,
+  :global([data-sidebar='collapsed']) .section-label,
+  :global([data-sidebar='collapsed']) .foot-label {
+    display: none;
+  }
+  :global([data-sidebar='collapsed']) .compose {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+    margin: 0 auto;
+  }
+  :global([data-sidebar='collapsed']) .folder {
+    justify-content: center;
+    padding: 0 !important;
+    width: 40px;
+    margin: 0 auto;
+  }
+  :global([data-sidebar='collapsed']) .folder .badge {
+    display: none;
+  }
+  :global([data-sidebar='collapsed']) .sidebar-foot {
+    justify-content: center;
+    flex-direction: column;
     gap: 4px;
-    margin-left: auto;
-    padding-right: 5px;
-    color: var(--faint);
-    font-size: 10.5px;
+  }
+  :global([data-sidebar='collapsed']) .shortcuts {
+    display: none;
+  }
+  :global([data-sidebar='collapsed']) .collapse {
+    width: 40px;
+    justify-content: center;
+    padding: 6px 0;
   }
 </style>

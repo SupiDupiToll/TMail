@@ -51,6 +51,7 @@ export interface MailDetail {
   recipients: Recipients;
   reply_to: Address[];
   sent_ms: number;
+  conversation_message_id: string;
   body_html: string;
   body_text: string;
   attachments: AttachmentMeta[];
@@ -92,6 +93,7 @@ export interface DraftInput {
   confidential: boolean;
   confidential_password: string | null;
   sender_address: string | null;
+  send_at_ms: number | null;
   previous_message_id: string | null;
   conversation_type: number;
 }

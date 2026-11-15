@@ -4,7 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 test.describe('dark theme', () => {
   test.use({ colorScheme: 'dark' });
 
-  test('renders dark, keeps contrast and does not overflow', async ({ page }) => {
+  test('renders dark, keeps contrast and a light mail canvas', async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('tmail.theme', 'dark');
     });
@@ -20,7 +20,17 @@ test.describe('dark theme', () => {
     const serious = results.violations.filter(
       (violation) => violation.impact === 'serious' || violation.impact === 'critical'
     );
-    expect(serious, serious.map((v) => v.id).join(', ')).toEqual([]);
+    expect(serious, serious.map((violation) => violation.id).join(', ')).toEqual([]);
+
+    const list = page.getByRole('listbox', { name: /Inbox messages/ });
+    await list.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { level: 2 })).toBeVisible();
+    const mailBackground = await page
+      .frameLocator('iframe')
+      .locator('body')
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(mailBackground).toBe('rgb(255, 255, 255)');
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -37,7 +47,7 @@ test.describe('HiDPI and text scaling', () => {
     const list = page.getByRole('listbox', { name: /Inbox messages/ });
     await expect(list).toBeVisible();
     const box = await list.getByRole('option').first().boundingBox();
-    expect(box?.height ?? 0).toBeGreaterThanOrEqual(43);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(50);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
     );

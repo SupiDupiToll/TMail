@@ -134,7 +134,16 @@
   }
 </script>
 
-<dialog bind:this={dialog} class="palette-dialog" oncancel={onCancel} onkeydown={onkeydown} aria-label="Command palette">
+<dialog
+  bind:this={dialog}
+  class="palette-dialog"
+  oncancel={onCancel}
+  onkeydown={onkeydown}
+  onclick={(event) => {
+    if (event.target === dialog) close();
+  }}
+  aria-label="Command palette"
+>
   <div class="palette">
     <div class="search-row">
       <Icon name="search" size={18} />

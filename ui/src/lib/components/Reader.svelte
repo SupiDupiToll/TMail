@@ -40,6 +40,18 @@
   });
 
   let frameCleanup: (() => void) | null = null;
+  let moreMenu = $state<HTMLDetailsElement | null>(null);
+
+  $effect(() => {
+    if (!moreMenu) return;
+    const onDocumentClick = (event: MouseEvent) => {
+      if (moreMenu?.open && !moreMenu.contains(event.target as Node)) {
+        moreMenu.open = false;
+      }
+    };
+    document.addEventListener('click', onDocumentClick);
+    return () => document.removeEventListener('click', onDocumentClick);
+  });
 
   function cleanupFrame(): void {
     frameCleanup?.();
@@ -197,21 +209,21 @@
           <button class="icon-btn" aria-label="Move to trash" title="Trash (#)" onclick={() => app.trash([detail.summary.id])}>
             <Icon name="trash" size={17} />
           </button>
-          <details class="menu">
+          <details class="menu" bind:this={moreMenu}>
             <summary class="icon-btn" aria-label="More actions" title="More actions">
               <Icon name="more" size={17} />
             </summary>
             <div class="menu-pop" role="menu" aria-label="More actions">
               {#each app.snapshot?.folders ?? [] as folder (folder.id)}
                 {#if folder.id !== app.selectedFolderId}
-                  <button role="menuitem" onclick={() => app.moveTo(folder.id, [detail.summary.id])}>
+                  <button role="menuitem" onclick={() => { moreMenu && (moreMenu.open = false); app.moveTo(folder.id, [detail.summary.id]); }}>
                     <Icon name="folder" size={14} />
                     Move to {folder.name || folder.kind}
                   </button>
                 {/if}
               {/each}
               <hr />
-              <button role="menuitem" class="danger" onclick={() => app.deleteForever([detail.summary.id])}>
+              <button role="menuitem" class="danger" onclick={() => { moreMenu && (moreMenu.open = false); app.deleteForever([detail.summary.id]); }}>
                 <Icon name="trash" size={14} />
                 Delete permanently
               </button>
@@ -287,9 +299,19 @@
           <div class="attachment">
             <span class="file-icon" aria-hidden="true"><Icon name="attachment" size={15} /></span>
             <div class="file-meta">
-              <span class="file-name" title={attachment.name}>{attachment.name}</span>
+              <button class="file-name" title={`Preview ${attachment.name}`} onclick={() => app.previewAttachment(attachment)}>
+                {attachment.name}
+              </button>
               <span class="faint tiny">{attachment.mime_type} · {formatBytes(attachment.size)}</span>
             </div>
+            <button
+              class="icon-btn"
+              aria-label={`Preview ${attachment.name}`}
+              title="Preview"
+              onclick={() => app.previewAttachment(attachment)}
+            >
+              <Icon name="eye" size={16} />
+            </button>
             <button class="btn btn-sm" onclick={() => app.saveAttachment(attachment.id, attachment.name)}>
               <Icon name="download" size={14} />
               Save
@@ -437,7 +459,7 @@
   iframe {
     display: block;
     width: 100%;
-    max-width: var(--reader-measure);
+    max-width: 100%;
     border: 0;
     background: transparent;
     color-scheme: light dark;
@@ -486,6 +508,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
+    color: var(--text);
+  }
+  .file-name:hover {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
   .status-line {
     flex: none;

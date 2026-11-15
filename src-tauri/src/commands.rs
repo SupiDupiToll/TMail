@@ -298,6 +298,39 @@ pub async fn save_draft(
 }
 
 #[derive(Serialize)]
+pub struct AttachmentData {
+    name: String,
+    mime_type: String,
+    /// Standard base64 of the decrypted attachment bytes.
+    data: String,
+}
+
+#[tauri::command]
+pub async fn read_attachment(
+    state: State<'_, AppState>,
+    mail_id: String,
+    attachment_id: String,
+    name: String,
+    mime_type: String,
+) -> ApiResult<AttachmentData> {
+    let bytes = state
+        .service
+        .download_attachment(&mail_id, &attachment_id)
+        .await?;
+    if bytes.len() > 12 * 1024 * 1024 {
+        return Err(ApiError::from(
+            "this attachment is too large to preview; save it instead".to_string(),
+        ));
+    }
+    use base64::prelude::{Engine, BASE64_STANDARD};
+    Ok(AttachmentData {
+        name,
+        mime_type,
+        data: BASE64_STANDARD.encode(bytes),
+    })
+}
+
+#[derive(Serialize)]
 pub struct SaveAttachmentResult {
     saved: bool,
     path: Option<String>,

@@ -145,6 +145,8 @@ pub struct MailDetail {
     pub recipients: Recipients,
     pub reply_to: Vec<Address>,
     pub sent_ms: i64,
+    /// The SMTP Message-ID of this mail, used for reply threading.
+    pub conversation_message_id: String,
     /// Decrypted body HTML. Must be sanitised by the renderer.
     pub body_html: String,
     /// Derived plain text used for local FTS and the reading fallback.
@@ -196,6 +198,7 @@ impl MailDetail {
                 })
                 .collect(),
             sent_ms: i64::try_from(details.sentDate.as_millis()).unwrap_or(0),
+            conversation_message_id: String::new(),
             body_html: html,
             body_text: text,
             attachments,
@@ -223,6 +226,9 @@ pub struct DraftInput {
     /// Sender address chosen in the composer (must be an enabled alias).
     #[serde(default)]
     pub sender_address: Option<String>,
+    /// Unix milliseconds for scheduled sending; `None` sends immediately.
+    #[serde(default)]
+    pub send_at_ms: Option<i64>,
     /// Reply/forward linkage, if any.
     #[serde(default)]
     pub previous_mail: Option<String>,

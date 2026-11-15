@@ -47,6 +47,8 @@
     <path d="M12 9v5M12 17.2v.1" />
   {:else if name === 'folder'}
     <path d="M3 6h6l2 2h10v11H3z" />
+  {:else if name === 'chevron-left'}
+    <path d="m15 6-6 6 6 6" />
   {:else if name === 'chevron'}
     <path d="m9 6 6 6-6 6" />
   {:else if name === 'chevron-down'}
@@ -66,6 +68,13 @@
     <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
     <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
     <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
+  {:else if name === 'maximize'}
+    <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+  {:else if name === 'minimize'}
+    <path d="M3 8h5V3M21 8h-5V3M3 16h5v5M21 16h-5v5" />
+  {:else if name === 'clock-plus'}
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7v5l3 2M18 3v4M16 5h4" />
   {:else if name === 'close'}
     <path d="M5 5l14 14M19 5 5 19" />
   {:else if name === 'check'}

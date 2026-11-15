@@ -1,7 +1,9 @@
 import { api, isMock, isTauri, notify, subscribeEvents, subscribeMailto } from './api';
 import { splitAddresses } from './addresses';
+import { senderLabel } from './format';
 import type { AppInfo } from './api';
 import type {
+  AttachmentMeta,
   DraftInput,
   MailDetail,
   MailSummary,
@@ -24,6 +26,18 @@ export interface Toast {
   action?: { label: string; run: () => void };
 }
 
+export interface PreviewState {
+  open: boolean;
+  loading: boolean;
+  name: string;
+  mimeType: string;
+  kind: 'image' | 'text' | 'other';
+  dataUrl: string;
+  text: string;
+  error: string | null;
+  attachment: AttachmentMeta | null;
+}
+
 export interface ComposerState {
   open: boolean;
   mode: 'new' | 'reply' | 'reply_all' | 'forward' | 'draft';
@@ -37,6 +51,7 @@ export interface ComposerState {
   plaintext: boolean;
   confidential: boolean;
   confidentialPassword: string;
+  sendAt: number | null;
   previousMessageId: string | null;
   conversationType: number;
   attachments: OutgoingAttachment[];
@@ -60,6 +75,7 @@ function emptyComposer(): ComposerState {
     plaintext: false,
     confidential: false,
     confidentialPassword: '',
+    sendAt: null,
     previousMessageId: null,
     conversationType: CONVERSATION_NEW,
     attachments: [],
@@ -68,6 +84,18 @@ function emptyComposer(): ComposerState {
     error: null,
     dirty: false
   };
+}
+
+function base64ToText(data: string): string {
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder('utf-8', { fatal: false }).decode(bytes).slice(0, 200_000);
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 function getString(key: string, fallback = ''): string {
@@ -118,12 +146,30 @@ export class MailApp {
     (getString('tmail.theme', 'system') as ThemePreference) || 'system'
   );
   density = $state<Density>((getString('tmail.density', 'compact') as Density) || 'compact');
+  sidebarWidth = $state(248);
+  listWidth = $state(420);
+  sidebarCollapsed = $state(false);
+  defaultSender = $state('');
+  signature = $state('');
+  notificationsEnabled = $state(true);
+  plaintextDefault = $state(false);
 
   remoteSenders = $state<string[]>([]);
   remoteOnce = $state<string[]>([]);
   selectedIds = $state<string[]>([]);
   toasts = $state<Toast[]>([]);
   unreadTotal = $state(0);
+  preview = $state<PreviewState>({
+    open: false,
+    loading: false,
+    name: '',
+    mimeType: '',
+    kind: 'other',
+    dataUrl: '',
+    text: '',
+    error: null,
+    attachment: null
+  });
 
   private toastSeq = 0;
   private media: MediaQueryList | null = null;
@@ -148,6 +194,13 @@ export class MailApp {
     this.applyTheme(this.theme);
     this.applyDensity(this.density);
     this.remoteSenders = this.loadRemoteSenders();
+    this.sidebarWidth = clampNumber(Number(getString('tmail.sidebar-width', '248')), 190, 380);
+    this.listWidth = clampNumber(Number(getString('tmail.list-width', '420')), 300, 680);
+    this.sidebarCollapsed = getString('tmail.sidebar-collapsed', '0') === '1';
+    this.defaultSender = getString('tmail.default-sender', '');
+    this.signature = getString('tmail.signature', '');
+    this.notificationsEnabled = getString('tmail.notifications', '1') !== '0';
+    this.plaintextDefault = getString('tmail.plaintext-default', '0') === '1';
     if (typeof window !== 'undefined') {
       this.media = window.matchMedia('(prefers-color-scheme: dark)');
       this.media.addEventListener('change', this.onSystemTheme);
@@ -211,13 +264,16 @@ export class MailApp {
     this.composer = {
       ...emptyComposer(),
       open: true,
-      from: this.snapshot?.sender_addresses[0] ?? this.snapshot?.email ?? '',
+      from: this.preferredSender(),
+      plaintext: this.plaintextDefault,
       to: request.to.join(', '),
       cc: request.cc.join(', '),
       bcc: request.bcc.join(', '),
       showCc: request.cc.length > 0 || request.bcc.length > 0,
       subject: request.subject,
-      body: request.body
+      body: this.signature.trim()
+        ? `${request.body.trimEnd()}\n\n-- \n${this.signature.trim()}`
+        : request.body
     };
   }
 
@@ -333,8 +389,14 @@ export class MailApp {
       const counts = await api.unreadCounts();
       if (this.snapshot) this.snapshot = { ...this.snapshot, unread: counts };
       const total = counts.reduce((sum, entry) => sum + entry.unread, 0);
-      if (total > this.unreadTotal && (await this.isWindowHidden())) {
-        void notify('New mail', 'You have new messages in TMail.');
+      if (total > this.unreadTotal && this.notificationsEnabled && (await this.isWindowHidden())) {
+        const fresh = mails.find(
+          (mail) => mail.unread && !this.mails.some((known) => known.id === mail.id)
+        );
+        void notify(
+          fresh ? senderLabel(fresh.sender.name, fresh.sender.address) : 'New mail',
+          fresh ? fresh.subject : 'You have new messages in TMail.'
+        );
       }
       this.unreadTotal = total;
       this.connection = 'online';
@@ -534,13 +596,14 @@ export class MailApp {
     const base = emptyComposer();
     base.open = true;
     base.mode = mode;
-    base.from = this.snapshot?.sender_addresses[0] ?? this.snapshot?.email ?? '';
+    base.from = this.preferredSender();
+    base.plaintext = this.plaintextDefault;
     base.replyToId = detail?.summary.id ?? null;
 
     if (detail && mode !== 'new') {
       const sender = detail.summary.sender;
       const to = (address: string) => address;
-      base.previousMessageId = detail.summary.conversation_id;
+      base.previousMessageId = detail.conversation_message_id || null;
       base.conversationType =
         mode === 'forward' ? CONVERSATION_FORWARD : CONVERSATION_REPLY;
       if (mode === 'forward') {
@@ -553,6 +616,9 @@ export class MailApp {
       }
     } else {
       base.conversationType = CONVERSATION_NEW;
+    }
+    if (this.signature.trim()) {
+      base.body = `${base.body.trimEnd()}\n\n-- \n${this.signature.trim()}`;
     }
     this.composer = base;
   }
@@ -610,6 +676,7 @@ export class MailApp {
       confidential: c.confidential,
       confidential_password: c.confidentialPassword || null,
       sender_address: c.from || this.snapshot?.email || null,
+      send_at_ms: c.sendAt,
       previous_message_id: c.previousMessageId,
       conversation_type: c.conversationType
     };
@@ -617,11 +684,12 @@ export class MailApp {
 
   async send(): Promise<boolean> {
     if (this.composer.busy) return false;
+    const scheduled = this.composer.sendAt !== null;
     this.composer = { ...this.composer, busy: true, error: null };
     try {
       await api.sendMail(this.draftInput(), this.composer.attachments);
       this.composer = emptyComposer();
-      this.toast('Message sent', 'success');
+      this.toast(scheduled ? 'Message scheduled' : 'Message sent', 'success');
       if (this.snapshot) {
         const sent = this.snapshot.folders.find((folder) => folder.kind === 'sent');
         if (sent && this.selectedFolderId === sent.id) void this.refreshCurrent(true);
@@ -647,6 +715,62 @@ export class MailApp {
     } catch (error) {
       this.composer = { ...this.composer, busy: false, error: this.message(error) };
     }
+  }
+
+  async previewAttachment(attachment: AttachmentMeta): Promise<void> {
+    if (!this.detail) return;
+    if (attachment.size > 12 * 1024 * 1024) {
+      this.toast('This attachment is too large to preview; save it instead.', 'error');
+      return;
+    }
+    this.preview = {
+      open: true,
+      loading: true,
+      name: attachment.name,
+      mimeType: attachment.mime_type,
+      kind: 'other',
+      dataUrl: '',
+      text: '',
+      error: null,
+      attachment
+    };
+    try {
+      const data = await api.readAttachment(
+        this.detail.summary.id,
+        attachment.id,
+        attachment.name,
+        attachment.mime_type
+      );
+      const mime = data.mime_type.toLowerCase();
+      if (/^image\/(png|jpe?g|gif|webp|bmp)$/.test(mime)) {
+        this.preview = {
+          ...this.preview,
+          loading: false,
+          kind: 'image',
+          dataUrl: `data:${mime};base64,${data.data}`
+        };
+      } else if (
+        mime.startsWith('text/') ||
+        mime.includes('json') ||
+        mime.includes('csv') ||
+        mime.includes('xml')
+      ) {
+        this.preview = {
+          ...this.preview,
+          loading: false,
+          kind: 'text',
+          text: base64ToText(data.data)
+        };
+      } else {
+        this.preview = { ...this.preview, loading: false, kind: 'other' };
+      }
+    } catch (error) {
+      this.preview = { ...this.preview, loading: false, error: this.message(error) };
+    }
+  }
+
+  closePreview(): void {
+    this.preview = { ...this.preview, open: false };
   }
 
   async saveAttachment(attachmentId: string, name: string): Promise<void> {
@@ -677,6 +801,55 @@ export class MailApp {
     this.density = density;
     setString('tmail.density', density);
     this.applyDensity(density);
+  }
+
+  setSidebarWidth(width: number): void {
+    this.sidebarWidth = clampNumber(width, 190, 380);
+    setString('tmail.sidebar-width', String(Math.round(this.sidebarWidth)));
+  }
+
+  setListWidth(width: number): void {
+    this.listWidth = clampNumber(width, 300, 680);
+    setString('tmail.list-width', String(Math.round(this.listWidth)));
+  }
+
+  toggleSidebar(): void {
+    this.sidebarCollapsed = !this.sidebarCollapsed;
+    setString('tmail.sidebar-collapsed', this.sidebarCollapsed ? '1' : '0');
+  }
+
+  preferredSender(): string {
+    const addresses = this.snapshot?.sender_addresses ?? [];
+    if (this.defaultSender && addresses.some((address) => address === this.defaultSender)) {
+      return this.defaultSender;
+    }
+    return addresses[0] ?? this.snapshot?.email ?? '';
+  }
+
+  setDefaultSender(address: string): void {
+    this.defaultSender = address;
+    setString('tmail.default-sender', address);
+  }
+
+  setSignature(signature: string): void {
+    this.signature = signature;
+    setString('tmail.signature', signature);
+  }
+
+  setNotifications(enabled: boolean): void {
+    this.notificationsEnabled = enabled;
+    setString('tmail.notifications', enabled ? '1' : '0');
+  }
+
+  setPlaintextDefault(enabled: boolean): void {
+    this.plaintextDefault = enabled;
+    setString('tmail.plaintext-default', enabled ? '1' : '0');
+  }
+
+  resetLayout(): void {
+    this.setSidebarWidth(248);
+    this.setListWidth(420);
+    if (this.sidebarCollapsed) this.toggleSidebar();
   }
 
   applyDensity(density: Density): void {

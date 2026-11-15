@@ -368,6 +368,17 @@ impl CoreService {
                     .await
                     .unwrap_or_default();
                 let mut detail = MailDetail::build(&mail, &details, attachments.clone());
+                if let Ok(conversation) = active
+                    .sdk
+                    .mail_facade()
+                    .get_crypto_entity_client()
+                    .load::<tuta_sdk::entities::generated::tutanota::ConversationEntry, _>(
+                        &mail.conversationEntry,
+                    )
+                    .await
+                {
+                    detail.conversation_message_id = conversation.messageId;
+                }
                 detail.body_html =
                     inline_images(&active, &mail, &detail.body_html, &attachments).await;
                 detail.body_text = crate::models::html_to_text(&detail.body_html);
@@ -388,6 +399,7 @@ impl CoreService {
                         },
                         reply_to: Vec::new(),
                         sent_ms: 0,
+                        conversation_message_id: String::new(),
                         body_html: html,
                         body_text: text,
                         attachments: Vec::new(),
@@ -526,6 +538,8 @@ impl CoreService {
             confidential_password: draft.confidential_password,
             sender_name: active.display_name.clone(),
             sender_address: sender,
+            send_at_ms: draft.send_at_ms,
+            own_addresses: active.sender_addresses.clone(),
             previous_message_id: draft.previous_message_id,
             conversation_type: draft.conversation_type,
             attachments: attachments
@@ -571,6 +585,8 @@ impl CoreService {
             confidential_password: draft.confidential_password,
             sender_name: active.display_name.clone(),
             sender_address: sender,
+            send_at_ms: draft.send_at_ms,
+            own_addresses: active.sender_addresses.clone(),
             previous_message_id: draft.previous_message_id,
             conversation_type: draft.conversation_type,
             attachments: attachments

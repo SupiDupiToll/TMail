@@ -20,6 +20,15 @@ We do not wait for answers; the safest default is implemented and noted here.
 
 ## Open technical questions
 
+- The send path was corrected on 2026-11-15 (empty `bodyText`, own-address
+  symmetric wrapping, confidential attachment keys, correct reply Message-ID).
+  It still needs a live send test before it is considered proven.
+- Sender logos/BIMI are deliberately not fetched: that would make requests to
+  arbitrary third-party domains and creates a phishing signal. Tuta contact
+  photos would be the privacy-preserving source; that is a later phase.
+- Server-side settings (rules, vacation, templates) remain in Tuta web until
+  their facades are implemented and tested.
+
 - Does Tuta intend to keep the `v362` model version accepted for long? The
   client tracks upstream tags; a version bump is routine.
 - Should the cache keep every body by default or only opened messages? Default:

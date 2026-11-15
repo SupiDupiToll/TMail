@@ -12,9 +12,11 @@ use crypto_primitives::aes::{Aes256Key, InitializationVector};
 use crypto_primitives::key::GenericAesKey;
 use crypto_primitives::randomizer_facade::RandomizerFacade;
 use tuta_sdk::blobs::blob_facade::FileData;
+use tuta_sdk::date::DateTime;
 use tuta_sdk::entities::generated::tutanota::{
     AttachmentKeyData, DraftAttachment, DraftCreateData, DraftData, DraftRecipient,
     InternalRecipientKeyData, NewDraftAttachment, SendDraftData, SendDraftParameters,
+    SymEncInternalRecipientKeyData,
 };
 use tuta_sdk::services::generated::tutanota::{DraftService, SendDraftService};
 use tuta_sdk::services::ExtraServiceParams;
@@ -48,6 +50,10 @@ pub struct Outgoing {
     pub confidential_password: Option<String>,
     pub sender_name: String,
     pub sender_address: String,
+    pub send_at_ms: Option<i64>,
+    /// All enabled addresses of the account (primary + aliases). Used to pick
+    /// symmetric key wrapping when sending to the user's own mailbox.
+    pub own_addresses: Vec<String>,
     pub previous_message_id: Option<String>,
     pub conversation_type: i64,
     pub attachments: Vec<OutgoingAttachment>,
@@ -89,14 +95,28 @@ pub async fn send(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<(String
     let confidential = effective_confidential(outgoing);
     let draft = create_draft(sdk, outgoing, confidential, &randomizer).await?;
 
+    let bucket_key: Option<GenericAesKey> = if confidential {
+        Some(Aes256Key::generate(&randomizer).into())
+    } else {
+        None
+    };
     let attachment_keys = if draft.attachment_keys.is_empty() {
         Vec::new()
     } else {
-        attachment_key_data(sdk, &draft.id, &draft.attachment_keys, &randomizer).await?
+        attachment_key_data(
+            sdk,
+            &draft.id,
+            &draft.attachment_keys,
+            bucket_key.as_ref(),
+            &randomizer,
+        )
+        .await?
     };
-    let (mail_session_key, bucket_enc_mail_session_key, internal_keys, auth_status) =
+    let (mail_session_key, bucket_enc_mail_session_key, internal_keys, sym_enc_keys, auth_status) =
         if confidential {
-            let bucket_key: GenericAesKey = Aes256Key::generate(&randomizer).into();
+            let bucket_key = bucket_key
+                .as_ref()
+                .expect("a bucket key exists for confidential mail");
             let bucket_enc = bucket_key.encrypt_key(
                 &draft.session_key,
                 InitializationVector::generate(&randomizer),
@@ -105,10 +125,42 @@ pub async fn send(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<(String
             let crypto = crypto_client.get_crypto_facade();
             let sender_group_id = sdk.get_user_group_id();
             let mut keys = Vec::new();
+            let mut sym_keys = Vec::new();
             let mut all_tuta_crypt = true;
             for address in outgoing.to.iter().chain(&outgoing.cc).chain(&outgoing.bcc) {
+                let is_own = outgoing
+                    .own_addresses
+                    .iter()
+                    .any(|own| own.eq_ignore_ascii_case(address.trim()));
+                if is_own {
+                    // Same mailbox: wrap the bucket key with the mail group key
+                    // instead of the recipient's public key (as the official
+                    // client does). This also works before a TutaCrypt identity
+                    // key pair exists for the account.
+                    let recipient_group = sdk
+                        .mail_facade()
+                        .get_group_id_for_mail_address(address.trim())
+                        .await
+                        .map_err(CoreError::from)?;
+                    let recipient_key = sdk
+                        .get_current_sym_group_key(&recipient_group)
+                        .await
+                        .map_err(CoreError::from)?;
+                    let sym_enc = recipient_key
+                        .object
+                        .encrypt_key(bucket_key, InitializationVector::generate(&randomizer));
+                    sym_keys.push(SymEncInternalRecipientKeyData {
+                        _id: None,
+                        mailAddress: address.trim().to_ascii_lowercase(),
+                        symEncBucketKey: sym_enc,
+                        symKeyVersion: i64::try_from(recipient_key.version).unwrap_or(i64::MAX),
+                        keyGroup: recipient_group,
+                    });
+                    all_tuta_crypt = false;
+                    continue;
+                }
                 let key = crypto
-                    .encrypt_bucket_key_for_recipient(&bucket_key, address, &sender_group_id)
+                    .encrypt_bucket_key_for_recipient(bucket_key, address, &sender_group_id)
                     .await
                     .map_err(|error| {
                         CoreError::Protocol(format!("recipient key encryption failed: {error}"))
@@ -131,11 +183,12 @@ pub async fn send(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<(String
             } else {
                 None
             };
-            (None, Some(bucket_enc), keys, auth_status)
+            (None, Some(bucket_enc), keys, sym_keys, auth_status)
         } else {
             (
                 Some(draft.session_key.as_bytes().to_vec()),
                 None,
+                Vec::new(),
                 Vec::new(),
                 None,
             )
@@ -146,17 +199,22 @@ pub async fn send(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<(String
         mail_session_key,
         bucket_enc_mail_session_key,
         internal_keys,
+        sym_enc_keys,
         auth_status,
         draft.id.clone(),
         parameters_id,
         attachment_keys,
         outgoing.plaintext,
+        outgoing
+            .send_at_ms
+            .and_then(|ms| u64::try_from(ms).ok())
+            .map(DateTime::from_millis),
     );
     let sent = sdk
         .get_service_executor()
         .post::<SendDraftService>(data, ExtraServiceParams::default())
         .await
-        .map_err(CoreError::from)?;
+        .map_err(|error| CoreError::Protocol(format!("send request failed: {error}")))?;
     Ok((
         sent.messageId,
         format!("{}/{}", draft.id.list_id.0, draft.id.element_id.0),
@@ -234,7 +292,7 @@ async fn create_draft(
     let data = DraftData {
         _id: None,
         subject: outgoing.subject.clone(),
-        bodyText: outgoing.body_html.clone(),
+        bodyText: String::new(),
         senderMailAddress: outgoing.sender_address.clone(),
         senderName: if outgoing.sender_name.is_empty() {
             outgoing.sender_address.clone()
@@ -272,7 +330,7 @@ async fn create_draft(
             },
         )
         .await
-        .map_err(CoreError::from)?;
+        .map_err(|error| CoreError::Protocol(format!("draft create failed: {error}")))?;
     Ok(CreatedDraft {
         id: created.draft,
         session_key,
@@ -364,14 +422,38 @@ async fn attachment_key_data(
     sdk: &Arc<LoggedInSdk>,
     draft_id: &IdTupleGenerated,
     keys: &[GenericAesKey],
+    bucket_key: Option<&GenericAesKey>,
     randomizer: &RandomizerFacade,
 ) -> Result<Vec<AttachmentKeyData>> {
-    let mail: tuta_sdk::entities::generated::tutanota::Mail = sdk
-        .mail_facade()
-        .get_crypto_entity_client()
-        .load(draft_id)
-        .await
-        .map_err(CoreError::from)?;
+    // The draft was just created; a couple of retries smooth over server
+    // replication before the attachment IDs become readable.
+    let mut mail: Option<tuta_sdk::entities::generated::tutanota::Mail> = None;
+    let mut last_error = None;
+    for attempt in 0..3 {
+        match sdk
+            .mail_facade()
+            .get_crypto_entity_client()
+            .load(draft_id)
+            .await
+        {
+            Ok(loaded) => {
+                mail = Some(loaded);
+                break;
+            }
+            Err(error) => {
+                last_error = Some(error);
+                tokio::time::sleep(std::time::Duration::from_millis(150 * (attempt + 1))).await;
+            }
+        }
+    }
+    let mail = mail.ok_or_else(|| {
+        CoreError::Protocol(format!(
+            "draft attachment lookup failed: {}",
+            last_error
+                .map(|error| error.to_string())
+                .unwrap_or_else(|| "unknown error".into())
+        ))
+    })?;
     if mail.attachments.len() != keys.len() {
         return Err(CoreError::Protocol(
             "server attachment count mismatch".into(),
@@ -381,11 +463,20 @@ async fn attachment_key_data(
         .attachments
         .into_iter()
         .zip(keys)
-        .map(|(file, key)| AttachmentKeyData {
-            _id: Some(random_custom_id(randomizer)),
-            bucketEncFileSessionKey: None,
-            fileSessionKey: Some(key.as_bytes().to_vec()),
-            file,
+        .map(|(file, key)| {
+            let (bucket_enc_file_session_key, file_session_key) = match bucket_key {
+                Some(bucket_key) => (
+                    Some(bucket_key.encrypt_key(key, InitializationVector::generate(randomizer))),
+                    None,
+                ),
+                None => (None, Some(key.as_bytes().to_vec())),
+            };
+            AttachmentKeyData {
+                _id: Some(random_custom_id(randomizer)),
+                bucketEncFileSessionKey: bucket_enc_file_session_key,
+                fileSessionKey: file_session_key,
+                file,
+            }
         })
         .collect())
 }
@@ -394,11 +485,13 @@ fn build_send_data(
     mail_session_key: Option<Vec<u8>>,
     bucket_enc_mail_session_key: Option<Vec<u8>>,
     internal_recipient_key_data: Vec<InternalRecipientKeyData>,
+    sym_enc_internal_recipient_key_data: Vec<SymEncInternalRecipientKeyData>,
     session_enc_encryption_auth_status: Option<Vec<u8>>,
     draft: IdTupleGenerated,
     parameters_id: CustomId,
     attachment_key_data: Vec<AttachmentKeyData>,
     plaintext: bool,
+    send_at: Option<DateTime>,
 ) -> SendDraftData {
     let parameters = SendDraftParameters {
         _id: Some(parameters_id),
@@ -412,7 +505,7 @@ fn build_send_data(
         mail: draft.clone(),
         internalRecipientKeyData: internal_recipient_key_data.clone(),
         secureExternalRecipientKeyData: Vec::new(),
-        symEncInternalRecipientKeyData: Vec::new(),
+        symEncInternalRecipientKeyData: sym_enc_internal_recipient_key_data.clone(),
         attachmentKeyData: attachment_key_data.clone(),
     };
     SendDraftData {
@@ -424,13 +517,13 @@ fn build_send_data(
         plaintext,
         calendarMethod: false,
         sessionEncEncryptionAuthStatus: session_enc_encryption_auth_status,
-        sendAt: None,
+        sendAt: send_at,
         allowUndo: false,
         internalRecipientKeyData: internal_recipient_key_data,
         secureExternalRecipientKeyData: Vec::new(),
         attachmentKeyData: attachment_key_data,
         mail: draft.clone(),
-        symEncInternalRecipientKeyData: Vec::new(),
+        symEncInternalRecipientKeyData: sym_enc_internal_recipient_key_data,
         parameters: Some(parameters),
     }
 }
@@ -460,6 +553,8 @@ mod tests {
             confidential_password: None,
             sender_name: "Me".into(),
             sender_address: "me@tuta.com".into(),
+            send_at_ms: None,
+            own_addresses: vec!["me@tuta.com".into()],
             previous_message_id: None,
             conversation_type: CONVERSATION_NEW,
             attachments: vec![],

@@ -258,6 +258,8 @@ density) inside an independently scrolling viewport. The reader header stays
 fixed; the message body scrolls.
 
 - 48 px top strip height shared by the account row and list header.
+- The mailbox rail and message list are drag-resizable; the rail collapses to a
+  72 px icon strip. Widths and collapse state persist locally.
 - 4 px spacing scale; 8 px between controls, 12–16 px inside panels, 24–28 px
   around the reader.
 - Breakpoints: ≤1120 px the reader overlays the list with a back action;
@@ -291,15 +293,19 @@ containers). Icons are authored 1.5 px-stroke SVGs; no icon font, no emoji.
   + a small verdigris dot. Selected = `selected-bg` with a 1 px `selected-border`.
   Hover is a single tonal step. No timestamp is shown.
 - **Reader**: subject, sender/recipient meta, action toolbar, blocked-content
-  notice, sandboxed body, attachment list. No card chrome around the body.
-- **Composer**: a rounded sheet anchored bottom-right on desktop, full-screen on
-  mobile; a From selector for aliases, bare inputs with bottom rules, serif
-  body, and a footer with send, attachment and plain-text mode. The encryption
-  state is automatic: a lock chip for Tuta recipients, an honest "not encrypted"
-  chip for external recipients.
+  notice, sandboxed body, attachment list with in-app image/text preview. Mail
+  always renders on a light canvas for contrast, independent of the app theme;
+  no card chrome around the body.
+- **Composer**: a rounded, resizable sheet anchored bottom-right on desktop
+  (full-screen on mobile), with an expand toggle; a From selector for aliases,
+  bare inputs with bottom rules, serif body, schedule-send clock, attachment
+  preview, and plain-text mode. The encryption state is automatic: a lock chip
+  for Tuta recipients, an honest "not encrypted" chip for external recipients.
 - **Palette**: 640 px, top 12vh, search first, grouped commands, message results
   with snippets, keyboard hints in the footer.
-- **Settings**: right-side sheet, segmented controls, no nested cards.
+- **Settings**: right-side sheet with appearance, sending, notifications,
+  privacy, account and about groups; segmented controls and no nested cards.
+  Server-side rules/vacation/templates are explicitly out of scope for now.
 - **Toasts**: bottom-right stack, one icon, one sentence, optional undo.
 
 ## Do's and Don'ts

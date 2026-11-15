@@ -16,8 +16,8 @@ deliberately out of scope.
 | Mail | Message list, newest first, virtualised | **MVP** | |
 | Mail | Unread state, mark read/unread | **MVP** | |
 | Mail | Message body (blob + draft storage) | **MVP** | safe mail CSS/legacy markup preserved |
-| Mail | Attachment listing + save | **MVP** | |
-| Mail | Send, reply, reply-all, forward | **MVP** | reply threading via conversation entry |
+| Mail | Attachment listing + save + image/text preview | **MVP** | PDF preview stays external |
+| Mail | Send, reply, reply-all, forward | **MVP** | reply threading via conversation entry; send path corrected 2026-11-15 |
 | Mail | Choose sender address / alias | **MVP** | From selector, validated against enabled aliases |
 | Mail | Drafts (create/save, resume editing) | partial | create/save works; editing an existing draft is `later` |
 | Mail | Signatures | later | settings model reserved |
@@ -26,14 +26,18 @@ deliberately out of scope.
 | Mail | Spam handling | **MVP** | move to Spam folder |
 | Mail | Local search (subject, sender, body) | **MVP** | FTS5 |
 | Mail | Import/export (EML) | later | |
-| Mail | Confidential mail to Tuta recipients | **MVP** | automatic; internal recipient key data, TutaCrypt/RSA |
+| Mail | Confidential mail to Tuta recipients | **MVP** | automatic; internal recipient key data, TutaCrypt/RSA; own addresses use symmetric wrapping |
 | Mail | Confidential mail to external recipients | blocked | password/external-group flow not exposed by the SDK; refused rather than downgraded |
 | Mail | Offline reading of cached mail | **MVP** | headers always; bodies once opened |
-| Mail | Remote content opt-in per sender | **MVP** | |
+| Mail | Remote content opt-in per sender | **MVP** | mail canvas is light for contrast |
+| Mail | Scheduled send | **MVP** | composer clock; server `sendAt` |
+| Mail | In-app attachment preview | **MVP** | images and text; PDFs open externally |
 | Mail | Keyboard-first triage | **MVP** | `j/k`, `u`, `e`, `#`, `r`, `a`, `f`, `Ctrl+K` |
+| Desktop | Collapsible rail + resizable columns | **MVP** | drag or arrow keys; persists |
 | Contacts | Address book, autocomplete | later | SDK contact facade exists |
 | Calendar | View/edit events | later | SDK calendar facade exists |
 | Settings | Theme follows system | **MVP** | |
+| Settings | Default sender, signature, plaintext, notifications, layout | **MVP** | local settings |
 | Settings | Density, text size | **MVP** | tokens |
 | Settings | Notification preferences | later | |
 | Desktop | Tray icon, close-to-tray | **MVP** | |

@@ -85,6 +85,20 @@ function mockInvoke(command: string, args?: Record<string, unknown>): unknown {
       mock.saveAttachment(String(args?.name));
       return { saved: true };
     }
+    case 'read_attachment': {
+      const mime = String(args?.mimeType ?? 'application/octet-stream');
+      const name = String(args?.name ?? 'attachment');
+      if (mime.startsWith('image/')) {
+        return {
+          name,
+          mime_type: mime,
+          data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lv8AAAAASUVORK5CYII='
+        };
+      }
+      const text = `Synthetic preview for ${name}.\n\nThis is an attachment from the TMail preview.\nIt is not real data.`;
+      const bytes = new TextEncoder().encode(text);
+      return { name, mime_type: mime, data: bytesToBase64(bytes) };
+    }
     case 'logout':
     case 'cancel_login':
     case 'clear_cache':
@@ -132,6 +146,12 @@ export interface SaveAttachmentResult {
   path?: string;
 }
 
+export interface AttachmentData {
+  name: string;
+  mime_type: string;
+  data: string;
+}
+
 export const api = {
   appInfo: () => invoke<AppInfo>('app_info'),
   resume: (email: string) => invoke<Snapshot | null>('resume', { email }),
@@ -164,6 +184,8 @@ export const api = {
     invoke<string>('save_draft', { draft, attachments }),
   saveAttachment: (mailId: string, attachmentId: string, name: string) =>
     invoke<SaveAttachmentResult>('save_attachment', { mailId, attachmentId, name }),
+  readAttachment: (mailId: string, attachmentId: string, name: string, mimeType: string) =>
+    invoke<AttachmentData>('read_attachment', { mailId, attachmentId, name, mimeType }),
   unreadCounts: () => invoke<{ folder_id: string; unread: number }[]>('unread_counts'),
   clearCache: () => invoke<void>('clear_cache'),
   quit: () => invoke<void>('quit_app'),

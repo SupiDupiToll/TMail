@@ -9,6 +9,7 @@
   import SettingsSheet from './SettingsSheet.svelte';
   import HelpSheet from './HelpSheet.svelte';
   import Toasts from './Toasts.svelte';
+  import AttachmentPreview from './AttachmentPreview.svelte';
 
   interface ListApi {
     navigate: (delta: number) => void;
@@ -17,6 +18,7 @@
   }
 
   let listRef = $state<ListApi | null>(null);
+  let shell = $state<HTMLElement | null>(null);
   let sidebarOpen = $state(false);
   let pendingG = false;
   let gTimer: ReturnType<typeof setTimeout> | null = null;
@@ -24,6 +26,29 @@
   const currentFolder = $derived(
     app.snapshot?.folders.find((folder) => folder.id === app.selectedFolderId) ?? null
   );
+
+  function startResize(kind: 'sidebar' | 'list', event: PointerEvent): void {
+    event.preventDefault();
+    const startX = event.clientX;
+    const initial = kind === 'sidebar' ? app.sidebarWidth : app.listWidth;
+    const onMove = (move: PointerEvent) => {
+      const delta = move.clientX - startX;
+      if (kind === 'sidebar') app.setSidebarWidth(initial + delta);
+      else app.setListWidth(initial + delta);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      document.body.classList.remove('resizing');
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    document.body.classList.add('resizing');
+  }
+
+  function nudge(kind: 'sidebar' | 'list', delta: number): void {
+    if (kind === 'sidebar') app.setSidebarWidth(app.sidebarWidth + delta);
+    else app.setListWidth(app.listWidth + delta);
+  }
 
   function focusList(): void {
     const viewport = document.querySelector<HTMLElement>('.virtual-viewport');
@@ -141,7 +166,11 @@
       target?.closest('input, textarea, select, [contenteditable="true"]')
     );
     const overlayOpen =
-      app.commandOpen || app.composer.open || app.settingsOpen || app.helpOpen;
+      app.commandOpen ||
+      app.composer.open ||
+      app.settingsOpen ||
+      app.helpOpen ||
+      app.preview.open;
     if (typing || overlayOpen) return;
     if (event.altKey || event.metaKey) return;
 
@@ -169,17 +198,53 @@
 
 <a class="skip-link" href="#message-list">Skip to message list</a>
 
-<div class="shell">
+<div
+  class="shell"
+  bind:this={shell}
+  data-sidebar={app.sidebarCollapsed ? 'collapsed' : 'expanded'}
+  style:--sidebar-width={`${app.sidebarCollapsed ? 72 : app.sidebarWidth}px`}
+  style:--list-width={`${app.listWidth}px`}
+>
   {#if sidebarOpen}
     <button class="drawer-scrim" aria-label="Close folders" onclick={() => (sidebarOpen = false)}></button>
   {/if}
   <div class="sidebar-wrap" class:open={sidebarOpen}>
     <Sidebar onNavigate={() => (sidebarOpen = false)} />
   </div>
+  {#if !app.sidebarCollapsed}
+    <button
+      type="button"
+      class="resizer sidebar-resizer"
+      aria-label="Resize mailbox sidebar"
+      title="Drag to resize; arrow keys also work"
+      onpointerdown={(event) => startResize('sidebar', event)}
+      onkeydown={(event) => {
+        if (event.key === 'ArrowLeft') nudge('sidebar', -12);
+        if (event.key === 'ArrowRight') nudge('sidebar', 12);
+      }}
+    ></button>
+  {/if}
+  <button
+    type="button"
+    class="resizer list-resizer"
+    aria-label="Resize message list"
+    title="Drag to resize; arrow keys also work"
+    onpointerdown={(event) => startResize('list', event)}
+    onkeydown={(event) => {
+      if (event.key === 'ArrowLeft') nudge('list', -12);
+      if (event.key === 'ArrowRight') nudge('list', 12);
+    }}
+  ></button>
 
   <main class="workspace" aria-label="Mail workspace">
     <div class="list-wrap" class:hidden-mobile={app.selectedMailId !== null}>
-      <MessageList bind:this={listRef} onMenu={() => (sidebarOpen = true)} />
+      <MessageList
+        bind:this={listRef}
+        onMenu={() => {
+          if (app.sidebarCollapsed) app.toggleSidebar();
+          sidebarOpen = true;
+        }}
+      />
     </div>
     <div class="reader-wrap" class:open={app.selectedMailId !== null}>
       <Reader onShortcut={onShortcutFromFrame} onBack={closeReader} />
@@ -191,6 +256,7 @@
 <CommandPalette />
 <SettingsSheet />
 <HelpSheet />
+<AttachmentPreview />
 <Toasts />
 
 <style>
@@ -212,10 +278,51 @@
     transform: translateY(0);
   }
   .shell {
+    position: relative;
     display: grid;
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
     height: 100%;
     background: var(--bg);
+  }
+  .resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    z-index: 26;
+    cursor: col-resize;
+    background: transparent;
+    border: 0;
+    padding: 0;
+  }
+  .resizer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 11px;
+    width: 1px;
+    background: transparent;
+    transition: background var(--dur-fast) ease-out;
+  }
+  .resizer:hover::after,
+  .resizer:focus-visible::after {
+    background: var(--accent);
+  }
+  .resizer:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -4px;
+    border-radius: var(--radius-xs);
+  }
+  .sidebar-resizer {
+    left: calc(var(--sidebar-width) - 12px);
+  }
+  .list-resizer {
+    left: calc(var(--sidebar-width) + var(--list-width) - 12px);
+  }
+  :global(body.resizing) {
+    cursor: col-resize;
+    user-select: none;
   }
   .sidebar-wrap {
     min-width: 0;
@@ -252,6 +359,9 @@
     .workspace {
       grid-template-columns: minmax(0, 1fr);
     }
+    .list-resizer {
+      display: none;
+    }
     .reader-wrap {
       display: none;
     }
@@ -269,6 +379,9 @@
   @media (max-width: 820px) {
     .shell {
       grid-template-columns: minmax(0, 1fr);
+    }
+    .resizer {
+      display: none;
     }
     .sidebar-wrap {
       position: fixed;

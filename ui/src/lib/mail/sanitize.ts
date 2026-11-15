@@ -206,7 +206,15 @@ function sanitizeCss(css: string, declarationList = false): string {
           list.remove(item);
           return;
         }
-        if (name === 'media' || name === 'supports') return;
+        if (name === 'media') {
+          const prelude = node.prelude ? csstree.generate(node.prelude).toLowerCase() : '';
+          if (prelude.includes('prefers-color-scheme: dark')) {
+            if (list) list.remove(item);
+            return;
+          }
+          return;
+        }
+        if (name === 'supports') return;
         if (list) list.remove(item);
       }
     });
@@ -273,24 +281,17 @@ function wrap(body: string, options: SanitizeOptions, emailCss = ''): SanitizedM
 <meta name="referrer" content="no-referrer">
 <title>Message from ${sender}</title>
 <style>
-  :root { color-scheme: light dark; }
+  :root { color-scheme: light; }
   html, body { margin: 0; padding: 0; }
   body {
     font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
     font-size: 16px;
     line-height: 1.62;
     color: #1a211d;
-    background: #fbfcf9;
+    background: #ffffff;
     padding: 4px 2px 24px;
     overflow-wrap: anywhere;
     font-variation-settings: 'opsz' 20, 'wght' 430;
-  }
-  @media (prefers-color-scheme: dark) {
-    body { color: #e6ebe4; background: #171d19; }
-    a { color: #8adcc9; }
-    .blocked-image { color: #a7b3a9; border-color: #3d493f; }
-    blockquote { border-color: #3d493f !important; color: #a7b3a9; }
-    hr { border-color: #2b342d; }
   }
   p { margin: 0 0 1em; }
   h1, h2, h3, h4 { line-height: 1.25; margin: 1.4em 0 0.5em; font-family: 'Atkinson Hyperlegible Next', sans-serif; }

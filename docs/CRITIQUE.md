@@ -50,6 +50,11 @@ protected external mail.
 - **Recovery:** implement only with a live test account; never fake the E2E
   state or silently downgrade.
 
+### [P2] Server-side settings are still in Tuta web
+- **Impact:** rules, vacation replies and templates are not editable in TMail.
+  Local sending, notification, appearance and privacy settings are present.
+- **Recovery:** add the server facades with live-account verification.
+
 ### [P2] Compose is plain text only
 - **Location:** `ui/src/lib/components/Composer.svelte`
 - **Impact:** no bold/italic/lists; users writing formatted mail must use the
@@ -80,9 +85,9 @@ protected external mail.
 ## Strengths
 
 - The avatar rows are recognisable without timestamps, and sender weight does
-  the scanning work.
+  the scanning work; columns resize and the rail collapses to icons.
 - Safe mail CSS and legacy markup are preserved, so real mail looks like mail
-  rather than a flattened text export.
+  rather than a flattened text export; the mail canvas stays light for contrast.
 - Remote content is blocked with a concrete, per-sender decision; the mail frame
   is script-free and its CSS is filtered for resource loads and fixed positioning.
 - Keyboard flow (`j/k`, `Enter`, `u/e/#`, `r/a/f`, `Ctrl+K`, `g` sequences) is
@@ -93,9 +98,9 @@ protected external mail.
 ## Evidence
 
 - `pnpm -C ui check`: 0 errors, 0 warnings.
-- `pnpm -C ui exec playwright test`: 24 passed, 1 skipped (screenshots).
+- `pnpm -C ui exec playwright test`: 28 passed, 1 skipped (screenshots).
 - `impeccable detect --json ui/src`: 0 findings.
-- `pnpm -C ui test`: 12 passed (sanitiser and formatting).
+- `pnpm -C ui test`: 13 passed (sanitiser and formatting).
 - `cargo test -p tmail-core`: 59 passed.
 - `cargo test -p tmail-desktop`: 3 passed (mailto parser).
 - Screenshots in `docs/review-shots/` (14: light/dark inbox, reader, composer,

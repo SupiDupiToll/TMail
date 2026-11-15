@@ -238,3 +238,91 @@ test('links are intercepted by the trusted parent, not navigated in-frame', asyn
     .toBe('https://example.com/verify');
   expect(page.url()).toContain('/?mock=inbox');
 });
+
+test('attachments preview in-app and close on the backdrop', async ({ page }) => {
+  await page.goto('/?mock=inbox');
+  const list = page.getByRole('listbox', { name: /Inbox messages/ });
+  await expect(list).toBeVisible();
+  await list.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { level: 2 })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Preview revenue-by-region.csv' }).click();
+  const dialog = page.getByRole('dialog', { name: 'revenue-by-region.csv' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(/Synthetic preview for revenue-by-region.csv/)).toBeVisible();
+  await page.mouse.click(5, 5);
+  await expect(dialog).toBeHidden();
+
+  await page.getByRole('button', { name: 'Preview quarterly-report.pdf' }).click();
+  const pdf = page.getByRole('dialog', { name: 'quarterly-report.pdf' });
+  await expect(pdf.getByText('Preview not available')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(pdf).toBeHidden();
+});
+
+test('sidebar collapses and columns can be resized from the keyboard', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto('/?mock=inbox');
+  await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
+
+  const sidebar = page.getByRole('complementary', { name: 'Mailbox' });
+  const expanded = (await sidebar.boundingBox())?.width ?? 0;
+  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(page.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
+  const collapsed = (await sidebar.boundingBox())?.width ?? 0;
+  expect(collapsed).toBeLessThan(expanded - 100);
+  await page.getByRole('button', { name: 'Expand sidebar' }).click();
+  const restored = (await sidebar.boundingBox())?.width ?? 0;
+  expect(restored).toBeGreaterThan(collapsed + 100);
+
+  const list = page.getByRole('region', { name: 'Inbox message list' });
+  const listBefore = (await list.boundingBox())?.width ?? 0;
+  const resizer = page.getByRole('button', { name: 'Resize message list' });
+  await resizer.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  const listAfter = (await list.boundingBox())?.width ?? 0;
+  expect(listAfter).toBeGreaterThan(listBefore + 10);
+});
+
+test('composer expands and schedules a send', async ({ page }) => {
+  await page.goto('/?mock=inbox');
+  await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
+  await page.keyboard.press('c');
+  const dialog = page.getByRole('dialog', { name: /New message/ });
+  await expect(dialog).toBeVisible();
+  const before = (await dialog.boundingBox())?.width ?? 0;
+  await dialog.getByRole('button', { name: 'Expand composer' }).click();
+  const expanded = (await dialog.boundingBox())?.width ?? 0;
+  expect(expanded).toBeGreaterThan(before + 20);
+  await dialog.getByRole('button', { name: 'Restore composer size' }).click();
+
+  await dialog.getByLabel('To').fill('ada@tuta.com');
+  await dialog.getByLabel('Subject').fill('Scheduled hello');
+  await dialog.getByLabel('Message body').fill('This goes out later.');
+  await dialog.getByRole('button', { name: 'Schedule send' }).click();
+  const when = dialog.getByLabel('Send at');
+  await when.fill('2030-01-02T09:30');
+  await dialog.getByRole('button', { name: 'Set' }).click();
+  await expect(dialog.getByRole('button', { name: /^Schedule/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Discard' }).click();
+});
+
+test('mail body uses the available reader width', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('/?mock=inbox');
+  const list = page.getByRole('listbox', { name: /Inbox messages/ });
+  await expect(list).toBeVisible();
+  await list.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { level: 2 })).toBeVisible();
+  const ratio = await page.evaluate(() => {
+    const frame = document.querySelector('iframe');
+    const reader = document.querySelector('.reader');
+    if (!frame || !reader) return 0;
+    return frame.clientWidth / reader.clientWidth;
+  });
+  expect(ratio).toBeGreaterThan(0.8);
+});

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from '../state.svelte';
-  import { api } from '../api';
+  import { api, notify } from '../api';
   import type { ThemePreference, Density } from '../state.svelte';
   import Icon from './Icon.svelte';
 
@@ -49,7 +49,15 @@
   ];
 </script>
 
-<dialog bind:this={dialog} class="sheet-dialog" oncancel={onCancel} aria-labelledby="settings-title">
+<dialog
+  bind:this={dialog}
+  class="sheet-dialog"
+  oncancel={onCancel}
+  onclick={(event) => {
+    if (event.target === dialog) close();
+  }}
+  aria-labelledby="settings-title"
+>
   <section class="sheet">
     <header class="sheet-head">
       <h2 id="settings-title">Settings</h2>
@@ -97,6 +105,82 @@
             {/each}
           </div>
         </div>
+        <div class="setting">
+          <div class="setting-copy">
+            <span class="setting-name">Layout</span>
+            <span class="setting-help">Reset sidebar and list widths.</span>
+          </div>
+          <button class="btn btn-sm" onclick={() => app.resetLayout()}>Reset layout</button>
+        </div>
+      </section>
+
+      <section class="group" aria-labelledby="sending-label">
+        <h3 id="sending-label">Sending</h3>
+        <div class="setting">
+          <div class="setting-copy">
+            <span class="setting-name">Default sender</span>
+            <span class="setting-help">Used for new messages.</span>
+          </div>
+          <select
+            class="select"
+            aria-label="Default sender"
+            value={app.defaultSender}
+            onchange={(event) => app.setDefaultSender((event.target as HTMLSelectElement).value)}
+          >
+            <option value="">Automatic</option>
+            {#each app.snapshot?.sender_addresses ?? [] as address (address)}
+              <option value={address}>{address}</option>
+            {/each}
+          </select>
+        </div>
+        <div class="setting column">
+          <div class="setting-copy">
+            <span class="setting-name">Signature</span>
+            <span class="setting-help">Appended to new messages from this device.</span>
+          </div>
+          <textarea
+            class="signature-input"
+            rows="3"
+            placeholder="— Name"
+            value={app.signature}
+            oninput={(event) => app.setSignature((event.target as HTMLTextAreaElement).value)}
+          ></textarea>
+        </div>
+        <label class="setting checkbox-setting">
+          <div class="setting-copy">
+            <span class="setting-name">Plain text by default</span>
+            <span class="setting-help">Send new messages as text/plain.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={app.plaintextDefault}
+            onchange={(event) => app.setPlaintextDefault((event.target as HTMLInputElement).checked)}
+          />
+        </label>
+      </section>
+
+      <section class="group" aria-labelledby="notifications-label">
+        <h3 id="notifications-label">Notifications</h3>
+        <label class="setting checkbox-setting">
+          <div class="setting-copy">
+            <span class="setting-name">New mail notifications</span>
+            <span class="setting-help">Only while the window is in the background.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={app.notificationsEnabled}
+            onchange={(event) => app.setNotifications((event.target as HTMLInputElement).checked)}
+          />
+        </label>
+        <div class="setting">
+          <div class="setting-copy">
+            <span class="setting-name">Test notification</span>
+            <span class="setting-help">Checks the desktop notification permission.</span>
+          </div>
+          <button class="btn btn-sm" onclick={() => notify('TMail', 'Notifications are working.')}>
+            Send test
+          </button>
+        </div>
       </section>
 
       <section class="group" aria-labelledby="privacy-label">
@@ -141,6 +225,18 @@
           </div>
           <button class="btn btn-sm" onclick={() => app.logout()}>Sign out</button>
         </div>
+        {#if (app.snapshot?.sender_addresses ?? []).length > 0}
+          <div class="setting column">
+            <div class="setting-copy">
+              <span class="setting-name">Sender addresses</span>
+            </div>
+            <div class="alias-list">
+              {#each app.snapshot?.sender_addresses ?? [] as address (address)}
+                <span class="alias">{address}</span>
+              {/each}
+            </div>
+          </div>
+        {/if}
         <div class="setting">
           <div class="setting-copy">
             <span class="setting-name">Session</span>
@@ -152,6 +248,9 @@
             {app.snapshot?.session_persisted ? 'Keyring' : 'Memory'}
           </span>
         </div>
+        <p class="server-note">
+          Server-side rules, vacation replies and templates are still managed in Tuta web.
+        </p>
       </section>
 
       <section class="group" aria-labelledby="about-label">
@@ -232,6 +331,50 @@
     align-items: center;
     gap: 16px;
     padding: 10px 0;
+  }
+  .checkbox-setting {
+    cursor: pointer;
+  }
+  .checkbox-setting input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+    flex: none;
+  }
+  .select {
+    height: 32px;
+    max-width: 220px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--panel-2);
+    color: var(--text);
+    font-size: var(--text-xs);
+  }
+  .signature-input {
+    width: 100%;
+    min-height: 72px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-reading);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .alias-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .alias {
+    padding: 3px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--panel-2);
+    color: var(--muted);
+    font-size: var(--text-xs);
   }
   .setting.column {
     flex-direction: column;
@@ -315,6 +458,15 @@
   }
   .mini-btn:hover {
     background: var(--accent-soft);
+  }
+  .server-note {
+    margin: 6px 0 2px;
+    padding: 8px 10px;
+    border-radius: var(--radius-xs);
+    background: var(--panel-2);
+    color: var(--faint);
+    font-size: 10.5px;
+    line-height: 1.45;
   }
   .about {
     display: flex;

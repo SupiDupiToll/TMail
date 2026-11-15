@@ -32,7 +32,7 @@ pub enum CoreError {
     CacheLocked,
     #[error("the requested item was not found")]
     NotFound,
-    #[error("the server returned data in an unexpected shape")]
+    #[error("the server returned data in an unexpected shape: {0}")]
     Protocol(String),
     #[error("network request failed: {0}")]
     Network(String),
@@ -104,7 +104,9 @@ impl From<ApiCallError> for CoreError {
                 }
                 other => Self::Api(other.to_string()),
             },
-            ApiCallError::InternalSdkError { .. } => Self::Protocol("SDK internal error".into()),
+            ApiCallError::InternalSdkError { error_message } => {
+                Self::Protocol(format!("SDK internal error: {error_message}"))
+            }
         }
     }
 }
@@ -158,7 +160,7 @@ impl From<std::io::Error> for CoreError {
 impl From<serde_json::Error> for CoreError {
     fn from(value: serde_json::Error) -> Self {
         log::error!("json error at line {}", value.line());
-        Self::Protocol("invalid JSON".into())
+        Self::Protocol(format!("invalid JSON at line {}", value.line()))
     }
 }
 

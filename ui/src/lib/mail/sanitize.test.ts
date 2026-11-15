@@ -30,6 +30,14 @@ describe('sanitizeMailHtml', () => {
     expect(srcdoc).not.toContain('fixed');
   });
 
+  it('keeps the mail canvas light by dropping dark-mode overrides', () => {
+    const { srcdoc } = sanitizeMailHtml(
+      '<style>@media (prefers-color-scheme: dark){body{background:#1a211d;color:#f5f6f3}}</style><p>Hi</p>',
+      options
+    );
+    expect(srcdoc).not.toContain('prefers-color-scheme: dark');
+  });
+
   it('keeps legacy presentational markup', () => {
     const { srcdoc } = sanitizeMailHtml(
       '<center><font color="#1d6b5f" face="Arial" size="3">Hi</font></center>',

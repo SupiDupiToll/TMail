@@ -41,10 +41,12 @@ Done:
 
 - Tauri 2 shell: window, tray with close-to-tray fallback, single instance,
   notifications, native save dialog, `mailto:` cold start, window state.
-- Svelte 5 UI: three-pane quiet-workspace layout, virtualised avatar list with no timestamps,
-  reader with sandboxed HTML, per-sender remote-content choice, attachments,
-  command palette, settings, keyboard shortcuts, light/dark/system, density.
-- Text-based verification: 24 Playwright tests + 12 Vitest tests pass (axe serious/critical = 0,
+- Svelte 5 UI: three-pane quiet-workspace layout, virtualised avatar list with
+  no timestamps, collapsible/resizable columns, reader with sandboxed HTML and
+  a light mail canvas, per-sender remote-content choice, attachment previews,
+  command palette, expanded local settings, keyboard shortcuts,
+  light/dark/system, density.
+- Text-based verification: 28 Playwright tests + 13 Vitest tests pass (axe serious/critical = 0,
   contrast computed numerically, 800/1280/1440/1920, 1.5 dpr, 200% text,
   sandbox/CSP, keyboard traversal, archive undo).
 - Impeccable detector: 0 findings over `ui/src`.
@@ -56,7 +58,8 @@ review the look manually; agents must not open the images.**
 ## Phase 3 — Compose
 
 Working: send, reply, reply-all, forward, attachments, plain-text mode, sender
-alias selection, automatic E2E for Tuta recipients, save draft (create).
+alias selection, automatic E2E for Tuta recipients (including symmetric wrapping
+for the user's own addresses), scheduled send, save draft (create).
 
 Missing: rich-text editing, editing an existing draft, **password-protected
 external mail**. The latter needs Tuta's external-group creation flow and a
@@ -74,7 +77,10 @@ Missing: label management, inbox rules UI, spam classification UI.
 ## Next
 
 1. Obtain the dedicated test account (`docs/QUESTIONS.md`) and run
-   `docs/SMOKE.md` (sender aliases, auto E2E, mail formatting).
+   `docs/SMOKE.md` (sender aliases, auto E2E, scheduled send, mail formatting,
+   attachment preview). Re-test the send path: the draft body shape, own-address
+   symmetric keys and confidential attachment keys were corrected, and errors
+   now carry the SDK detail so any remaining failure is actionable.
 2. Add a `tauri-driver` smoke job for tray/notifications/mailto.
 3. Implement external confidential mail once the SDK exposes the external
    group/Bcrypt flow (or port it carefully with live tests).

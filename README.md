@@ -20,10 +20,12 @@ access to what you have read, and no telemetry.
 ## Status
 
 Working now: sign-in with TOTP, encrypted local cache, folder tree, a
-keyboard-first three-pane UI, sender avatars and a timestamp-free list, body
-and attachment reads that keep safe mail formatting, send/reply/forward with
-sender-alias selection, automatic E2E for Tuta recipients, move/trash/archive/
-delete, local full-text search, realtime event bus and a sandboxed HTML reader.
+keyboard-first three-pane UI with collapsible/resizable columns, sender avatars
+and a timestamp-free list, body and attachment reads that keep safe mail
+formatting on a readable light canvas, in-app image/text attachment previews,
+send/reply/forward with sender-alias selection, automatic E2E for Tuta
+recipients, scheduled send, move/trash/archive/delete, local full-text search,
+realtime event bus and a sandboxed HTML reader.
 Draft editing, rich-text compose, password-protected external mail, contacts and
 calendar are next; see `docs/STATUS.md` for the exact state and
 `docs/FEATURE-MATRIX.md` for the roadmap.

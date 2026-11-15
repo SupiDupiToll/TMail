@@ -96,6 +96,7 @@ pub fn run() {
             commands::send_mail,
             commands::save_draft,
             commands::save_attachment,
+            commands::read_attachment,
             commands::open_external,
             commands::quit_app,
             commands::take_pending_mailto,

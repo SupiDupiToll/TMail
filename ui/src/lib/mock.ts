@@ -136,7 +136,7 @@ for (let i = 0; i < 240; i++) {
   const subject = subjects[i % subjects.length];
   const received = now - i * 37 * 60_000 - (i % 7) * day;
   const id = `list-inbox/${String(i).padStart(12, '0')}`;
-  const attachmentCount = i % 6 === 0 ? (i % 12 === 0 ? 2 : 1) : 0;
+  const attachmentCount = i === 7 ? 2 : i % 6 === 0 ? (i % 12 === 0 ? 2 : 1) : 0;
   const summary: MailSummary = {
     id,
     element_id: String(i).padStart(12, '0'),
@@ -174,6 +174,7 @@ for (let i = 0; i < 240; i++) {
     },
     reply_to: [],
     sent_ms: received + 120_000,
+    conversation_message_id: `<synthetic-${i}@tmail.invalid>`,
     body_html:
       i === 7
         ? richBody
@@ -214,6 +215,7 @@ for (let i = 0; i < 2; i++) {
     recipients: { to: [], cc: [], bcc: [] },
     reply_to: [],
     sent_ms: 0,
+    conversation_message_id: '',
     body_html: '<p>Draft body…</p>',
     body_text: 'Draft body',
     attachments: []
@@ -341,6 +343,7 @@ export const mock = {
       },
       reply_to: [],
       sent_ms: Date.now(),
+      conversation_message_id: `<${Date.now()}@tmail.invalid>`,
       body_html: draft.body_html,
       body_text: draft.body_html.replace(/<[^>]+>/g, ' '),
       attachments: []

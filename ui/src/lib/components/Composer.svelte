@@ -10,6 +10,9 @@
   let bodyInput = $state<HTMLTextAreaElement | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
   let discardOpen = $state(false);
+  let maximized = $state(false);
+  let scheduleOpen = $state(false);
+  let scheduleInput = $state('');
 
   const composer = $derived(app.composer);
   const senders = $derived(app.snapshot?.sender_addresses ?? []);
@@ -97,9 +100,45 @@
       (composer.to.trim() || composer.cc.trim() || composer.bcc.trim()) &&
       !composer.error
   );
+
+  function openSchedule(): void {
+    if (!scheduleInput) {
+      const next = new Date(Date.now() + 60 * 60 * 1000);
+      next.setSeconds(0, 0);
+      const local = new Date(next.getTime() - next.getTimezoneOffset() * 60_000);
+      scheduleInput = local.toISOString().slice(0, 16);
+    }
+    scheduleOpen = true;
+  }
+
+  function applySchedule(): void {
+    const timestamp = new Date(scheduleInput).getTime();
+    if (!Number.isFinite(timestamp)) return;
+    if (timestamp <= Date.now()) {
+      app.toast('Choose a time in the future.', 'error');
+      return;
+    }
+    app.updateComposer({ sendAt: timestamp });
+    scheduleOpen = false;
+  }
+
+  function clearSchedule(): void {
+    app.updateComposer({ sendAt: null });
+    scheduleOpen = false;
+  }
 </script>
 
-<dialog bind:this={dialog} class="composer-dialog" oncancel={onCancel} onkeydown={onKeydown} aria-labelledby="composer-title">
+<dialog
+  bind:this={dialog}
+  class="composer-dialog"
+  class:maximized
+  oncancel={onCancel}
+  onkeydown={onKeydown}
+  aria-labelledby="composer-title"
+  onclick={(event) => {
+    if (event.target === dialog) close();
+  }}
+>
   <section class="composer" aria-label={title}>
     <header class="compose-head">
       <h2 id="composer-title">{title}</h2>
@@ -118,6 +157,14 @@
         <button class="btn btn-sm btn-ghost" onclick={() => app.saveDraft()} disabled={composer.busy}>
           Save draft
         </button>
+        <button
+          class="icon-btn"
+          aria-label={maximized ? 'Restore composer size' : 'Expand composer'}
+          title={maximized ? 'Restore' : 'Expand'}
+          onclick={() => (maximized = !maximized)}
+        >
+          <Icon name={maximized ? 'minimize' : 'maximize'} size={16} />
+        </button>
         <button class="icon-btn" aria-label="Close composer" title="Close (Esc)" onclick={close}>
           <Icon name="close" size={17} />
         </button>
@@ -135,16 +182,19 @@
     <div class="fields">
       <div class="field-row">
         <label class="field-label" for="compose-from">From</label>
-        <select
-          id="compose-from"
-          class="from-select"
-          bind:value={composer.from}
-          onchange={() => app.updateComposer({ from: composer.from })}
-        >
-          {#each senders as sender (sender)}
-            <option value={sender}>{sender}</option>
-          {/each}
-        </select>
+        <div class="from-wrap">
+          <select
+            id="compose-from"
+            class="from-select"
+            bind:value={composer.from}
+            onchange={() => app.updateComposer({ from: composer.from })}
+          >
+            {#each senders as sender (sender)}
+              <option value={sender}>{sender}</option>
+            {/each}
+          </select>
+          <Icon name="chevron-down" size={14} />
+        </div>
       </div>
       <div class="field-row">
         <label class="field-label" for="compose-to">To</label>
@@ -208,20 +258,58 @@
           <p>{composer.error}</p>
           <p class="tiny">Your text is still here.</p>
         </div>
+        <button
+          class="btn btn-sm"
+          onclick={() => navigator.clipboard?.writeText(composer.error ?? '')}
+        >
+          Copy details
+        </button>
+      </div>
+    {/if}
+
+    {#if scheduleOpen}
+      <div class="schedule-row" role="group" aria-label="Schedule send">
+        <Icon name="clock" size={15} />
+        <input
+          class="schedule-input"
+          type="datetime-local"
+          bind:value={scheduleInput}
+          aria-label="Send at"
+        />
+        <button class="btn btn-sm" onclick={applySchedule}>Set</button>
+        <button class="btn btn-sm btn-ghost" onclick={clearSchedule}>Now</button>
       </div>
     {/if}
 
     <footer class="compose-foot">
       <button class="btn btn-primary send" onclick={send} disabled={!canSend}>
         {#if composer.busy}<span class="spinner"></span>{/if}
-        {composer.busy ? 'Sending…' : 'Send'}
+        {composer.busy ? 'Sending…' : composer.sendAt ? 'Schedule' : 'Send'}
         <span class="send-kbd"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">↵</kbd></span>
       </button>
       <button class="icon-btn" aria-label="Attach file" title="Attach file" onclick={() => fileInput?.click()}>
         <Icon name="attachment" size={17} />
       </button>
+      <button
+        class="icon-btn"
+        aria-label={composer.sendAt ? 'Change scheduled send' : 'Schedule send'}
+        title={composer.sendAt ? 'Change schedule' : 'Schedule send'}
+        class:scheduled={composer.sendAt !== null}
+        onclick={openSchedule}
+      >
+        <Icon name="clock" size={17} />
+      </button>
       <input bind:this={fileInput} type="file" multiple hidden onchange={pickFiles} />
       <div class="tolong"></div>
+      {#if composer.sendAt}
+        <span class="schedule-chip">
+          <Icon name="clock" size={12} />
+          {new Date(composer.sendAt).toLocaleString()}
+          <button aria-label="Clear schedule" onclick={() => app.updateComposer({ sendAt: null })}>
+            <Icon name="close" size={10} />
+          </button>
+        </span>
+      {/if}
       <label class="toggle" title="Send as text/plain">
         <input type="checkbox" checked={composer.plaintext} onchange={(e) => app.updateComposer({ plaintext: (e.target as HTMLInputElement).checked })} />
         Plain text
@@ -244,6 +332,15 @@
     color: var(--text);
     box-shadow: var(--shadow);
     overflow: hidden;
+    resize: both;
+    min-width: 520px;
+    min-height: 420px;
+  }
+  .composer-dialog.maximized {
+    resize: none;
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
+    margin: 12px;
   }
   .composer-dialog::backdrop {
     background: var(--scrim);
@@ -320,9 +417,25 @@
     font-size: var(--text-sm);
     color: var(--text);
   }
+  .from-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+  }
   .from-select {
+    width: 100%;
+    padding-right: 22px;
+    appearance: none;
     cursor: pointer;
     font-weight: 600;
+  }
+  .from-wrap :global(svg) {
+    position: absolute;
+    right: 4px;
+    color: var(--faint);
+    pointer-events: none;
   }
   .bare-input::placeholder {
     color: var(--faint);
@@ -465,6 +578,55 @@
   }
   .toggle input {
     accent-color: var(--accent);
+  }
+  .schedule-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    padding: 7px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+  }
+  .schedule-input {
+    flex: 1;
+    min-width: 0;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--bg);
+    color: var(--text);
+    font-size: var(--text-xs);
+  }
+  .schedule-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 6px 0 8px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 10.5px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .schedule-chip button {
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    color: inherit;
+  }
+  .schedule-chip button:hover {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+  }
+  .icon-btn.scheduled {
+    background: var(--accent-soft);
+    color: var(--accent);
   }
   .discard {
     display: flex;

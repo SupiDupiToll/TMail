@@ -56,7 +56,15 @@
   ];
 </script>
 
-<dialog bind:this={dialog} class="help-dialog" oncancel={(e) => { e.preventDefault(); close(); }} aria-labelledby="help-title">
+<dialog
+  bind:this={dialog}
+  class="help-dialog"
+  oncancel={(e) => { e.preventDefault(); close(); }}
+  onclick={(event) => {
+    if (event.target === dialog) close();
+  }}
+  aria-labelledby="help-title"
+>
   <section class="help">
     <header class="help-head">
       <h2 id="help-title">Keyboard shortcuts</h2>
