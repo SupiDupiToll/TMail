@@ -13,6 +13,7 @@ import type { AppInfo } from './api';
 import type {
   AttachmentMeta,
   DraftInput,
+  FolderNode,
   MailDetail,
   MailSummary,
   MailtoRequest,
@@ -50,6 +51,7 @@ export interface ComposerState {
   open: boolean;
   mode: 'new' | 'reply' | 'reply_all' | 'forward' | 'draft';
   from: string;
+  draftId: string | null;
   to: string;
   cc: string;
   bcc: string;
@@ -74,6 +76,7 @@ function emptyComposer(): ComposerState {
     open: false,
     mode: 'new',
     from: '',
+    draftId: null,
     to: '',
     cc: '',
     bcc: '',
@@ -135,12 +138,16 @@ export class MailApp {
   refreshing = $state(false);
   selectedMailId = $state<string | null>(null);
   detail = $state<MailDetail | null>(null);
+  thread = $state<MailSummary[]>([]);
   loadingMail = $state(false);
 
   searchQuery = $state('');
   searchHits = $state<SearchHit[]>([]);
   searching = $state(false);
   searchOpen = $state(false);
+  searchMode = $state(false);
+  searchFilter = $state<'all' | 'unread' | 'attachments'>('all');
+  searchFolder = $state('');
 
   commandOpen = $state(false);
   settingsOpen = $state(false);
@@ -167,6 +174,7 @@ export class MailApp {
   selectedIds = $state<string[]>([]);
   toasts = $state<Toast[]>([]);
   unreadTotal = $state(0);
+  contacts = $state<import('./api').Contact[]>([]);
   preview = $state<PreviewState>({
     open: false,
     loading: false,
@@ -367,6 +375,7 @@ export class MailApp {
     }
     if (target) void this.selectFolder(target.id);
     void this.checkInboxForNewMail();
+    void this.loadContacts();
   }
 
   async logout(): Promise<void> {
@@ -389,9 +398,13 @@ export class MailApp {
     this.selectedFolderId = folderId;
     this.selectedMailId = null;
     this.detail = null;
+    this.thread = [];
     this.selectedIds = [];
     this.searchOpen = false;
+    this.searchMode = false;
     this.searchQuery = '';
+    this.searchFolder = '';
+    this.searchFilter = 'all';
     this.error = null;
     this.loadingFolder = true;
     void api.setCurrentFolder(folderId).catch(() => {});
@@ -432,6 +445,7 @@ export class MailApp {
   async openMail(id: string): Promise<void> {
     this.selectedMailId = id;
     this.detail = null;
+    this.thread = [];
     this.loadingMail = true;
     this.error = null;
     try {
@@ -439,6 +453,11 @@ export class MailApp {
       if (this.selectedMailId !== id) return;
       this.detail = detail;
       this.loadingMail = false;
+      try {
+        this.thread = await api.loadThread(id);
+      } catch {
+        this.thread = [detail.summary];
+      }
       const summary = this.mails.find((mail) => mail.id === id);
       if (summary?.unread) {
         if (this.readTimer) clearTimeout(this.readTimer);
@@ -555,6 +574,31 @@ export class MailApp {
     }
   }
 
+  labels(): FolderNode[] {
+    return (this.snapshot?.folders ?? []).filter((folder) => folder.kind === 'label');
+  }
+
+  async toggleLabel(mailId: string, labelId: string, add: boolean): Promise<void> {
+    try {
+      await api.applyLabels([mailId], add ? [labelId] : [], add ? [] : [labelId]);
+      const summary = this.detail?.summary;
+      if (summary) {
+        summary.folder_ids = add
+          ? [...summary.folder_ids, labelId]
+          : summary.folder_ids.filter((id) => id !== labelId);
+      }
+      const mail = this.mails.find((item) => item.id === mailId);
+      if (mail) {
+        mail.folder_ids = add
+          ? [...mail.folder_ids, labelId]
+          : mail.folder_ids.filter((id) => id !== labelId);
+      }
+      this.toast(add ? 'Label added' : 'Label removed');
+    } catch (error) {
+      this.toast(this.message(error), 'error');
+    }
+  }
+
   async moveTo(folderId: string, ids: string[] = this.targetIds()): Promise<void> {
     if (!ids.length) return;
     try {
@@ -585,17 +629,19 @@ export class MailApp {
     this.selectedIds = [];
   }
 
-  async search(query: string): Promise<void> {
+  async openSearch(query: string): Promise<void> {
     this.searchQuery = query;
+    this.searchMode = true;
+    this.searchOpen = false;
+    this.searchFilter = 'all';
+    this.searchFolder = '';
     if (!query.trim()) {
       this.searchHits = [];
-      this.searchOpen = false;
       return;
     }
-    this.searchOpen = true;
     this.searching = true;
     try {
-      this.searchHits = await api.search(query, 60);
+      this.searchHits = await api.search(query, 200);
     } catch (error) {
       this.error = this.message(error);
     } finally {
@@ -605,8 +651,11 @@ export class MailApp {
 
   closeSearch(): void {
     this.searchOpen = false;
+    this.searchMode = false;
     this.searchQuery = '';
     this.searchHits = [];
+    this.searchFolder = '';
+    this.searchFilter = 'all';
   }
 
   // ---------------------------------------------------------------- composer
@@ -697,6 +746,7 @@ export class MailApp {
       confidential: c.confidential,
       confidential_password: c.confidentialPassword || null,
       sender_address: c.from || this.snapshot?.email || null,
+      draft_id: c.draftId,
       send_at_ms: c.sendAt,
       previous_message_id: c.previousMessageId,
       conversation_type: c.conversationType
@@ -724,6 +774,28 @@ export class MailApp {
       };
       return false;
     }
+  }
+
+  editDraft(detail: MailDetail): void {
+    if (detail.attachments.length > 0) {
+      this.toast('Editing drafts with attachments is not supported yet.', 'error');
+      return;
+    }
+    const base = emptyComposer();
+    base.open = true;
+    base.mode = 'draft';
+    base.draftId = detail.summary.id;
+    base.from = detail.summary.sender.address;
+    base.to = detail.recipients.to.map((address) => address.address).join(', ');
+    base.cc = detail.recipients.cc.map((address) => address.address).join(', ');
+    base.bcc = detail.recipients.bcc.map((address) => address.address).join(', ');
+    base.showCc = detail.recipients.cc.length > 0 || detail.recipients.bcc.length > 0;
+    base.subject = detail.summary.subject;
+    base.body = detail.body_text;
+    base.confidential = detail.summary.confidential;
+    base.previousMessageId = detail.conversation_message_id || null;
+    base.dirty = true;
+    this.composer = base;
   }
 
   async saveDraft(): Promise<void> {
@@ -944,6 +1016,21 @@ export class MailApp {
     } finally {
       this.inboxCheckInFlight = false;
     }
+  }
+
+  async loadContacts(): Promise<void> {
+    try {
+      this.contacts = await api.loadContacts();
+    } catch {
+      // Contacts are an enhancement; mail still works without them.
+    }
+  }
+
+  contactName(address: string): string | undefined {
+    const wanted = address.trim().toLowerCase();
+    return this.contacts.find((contact) =>
+      contact.addresses.some((candidate) => candidate.toLowerCase() === wanted)
+    )?.name;
   }
 
   private async isWindowHidden(): Promise<boolean> {

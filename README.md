@@ -40,6 +40,10 @@ reader that never loads a tracking pixel by itself.
 
 ![TMail command palette with actions and local search](docs/review-shots/palette-light.png)
 
+### Search
+
+![TMail full search with unread, attachment and folder filters](docs/review-shots/search-light.png)
+
 ### Settings
 
 ![TMail settings for appearance, sending, notifications and privacy](docs/review-shots/settings-light.png)
@@ -62,6 +66,7 @@ reader that never loads a tracking pixel by itself.
 | **Local-first** | Encrypted SQLCipher cache and FTS5 search. Lists and opened bodies answer from disk before the network. |
 | **Keyboard-first** | `j/k` navigation, `u/e/#`, `r/a/f`, `g` folder jumps, `Ctrl+K` command palette, full shortcut sheet. |
 | **Mail looks like mail** | Safe sender CSS, tables and legacy markup are preserved. Remote images and tracking pixels stay blocked per sender. |
+| **Find and understand** | Full search view with filters, conversation strips, contact autocomplete and trust badges for TutaCrypt/RSA/AES. |
 | **Encryption without rituals** | Automatic E2E for Tuta recipients, including **Tuta-hosted custom domains**. No manual “confidential” checkbox for Tuta users. |
 | **Compose that fits a desktop** | Sender aliases, scheduled send, attachments, image/text previews, plain-text mode, signature, Gmail-style composer. |
 | **Quiet by default** | No telemetry, no analytics, no update pings. The network allowlist only permits Tuta-owned hosts. |

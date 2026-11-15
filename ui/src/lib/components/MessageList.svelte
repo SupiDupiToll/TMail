@@ -16,12 +16,28 @@
   );
 
   const folderName = $derived(
-    folder?.name || (folder?.kind ? capitalise(folder.kind) : 'Mail')
+    app.searchMode
+      ? `Search: ${app.searchQuery}`
+      : folder?.name || (folder?.kind ? capitalise(folder.kind) : 'Mail')
   );
+
+  const displayedMails = $derived.by(() => {
+    if (!app.searchMode) return app.mails;
+    return app.searchHits
+      .map((hit) => hit.mail)
+      .filter((mail) => {
+        if (app.searchFilter === 'unread' && !mail.unread) return false;
+        if (app.searchFilter === 'attachments' && !mail.has_attachments) return false;
+        if (app.searchFolder && !mail.folder_ids.includes(app.searchFolder)) return false;
+        return true;
+      });
+  });
+
+  const rows = $derived(displayedMails);
 
   const focusedIndex = $derived(
     app.selectedMailId
-      ? app.mails.findIndex((mail) => mail.id === app.selectedMailId)
+      ? rows.findIndex((mail) => mail.id === app.selectedMailId)
       : -1
   );
 
@@ -47,16 +63,16 @@
 
   function choose(index: number, open = true): void {
     localFocus = index;
-    const mail = app.mails[index];
+    const mail = rows[index];
     if (!mail) return;
     if (open) void app.openMail(mail.id);
     else app.selectedMailId = mail.id;
   }
 
   export function navigate(delta: number): void {
-    if (!app.mails.length) return;
+    if (!rows.length) return;
     const base = localFocus >= 0 ? localFocus : app.selectedMailId ? focusedIndex : -1;
-    const next = Math.min(app.mails.length - 1, Math.max(0, base + delta));
+    const next = Math.min(rows.length - 1, Math.max(0, base + delta));
     choose(next);
   }
 
@@ -65,7 +81,7 @@
   }
 
   export function focusFirstUnread(): void {
-    const index = app.mails.findIndex((mail) => mail.unread);
+    const index = rows.findIndex((mail) => mail.unread);
     choose(index >= 0 ? index : 0);
   }
 
@@ -115,7 +131,7 @@
         <Icon name="menu" size={17} />
       </button>
       <h1>{folderName}</h1>
-      <span class="count tabular">{app.mails.length}</span>
+      <span class="count tabular">{displayedMails.length}</span>
       <div class="grow"></div>
       <button
         class="icon-btn"
@@ -125,6 +141,11 @@
       >
         <Icon name="search" size={16} />
       </button>
+      {#if app.searchMode}
+        <button class="icon-btn" aria-label="Clear search" title="Clear search" onclick={() => app.closeSearch()}>
+          <Icon name="close" size={16} />
+        </button>
+      {/if}
       <button
         class="icon-btn"
         aria-label="Refresh folder"
@@ -146,6 +167,37 @@
       <div class="refresh-line" aria-hidden="true"></div>
     {/if}
   </header>
+
+  {#if app.searchMode}
+    <div class="search-filters" role="toolbar" aria-label="Search filters">
+      <button
+        class="filter-chip"
+        class:active={app.searchFilter === 'all'}
+        aria-pressed={app.searchFilter === 'all'}
+        onclick={() => (app.searchFilter = 'all')}
+      >All</button>
+      <button
+        class="filter-chip"
+        class:active={app.searchFilter === 'unread'}
+        aria-pressed={app.searchFilter === 'unread'}
+        onclick={() => (app.searchFilter = 'unread')}
+      >Unread</button>
+      <button
+        class="filter-chip"
+        class:active={app.searchFilter === 'attachments'}
+        aria-pressed={app.searchFilter === 'attachments'}
+        onclick={() => (app.searchFilter = 'attachments')}
+      >Attachments</button>
+      <select class="filter-select" aria-label="Limit search to folder" bind:value={app.searchFolder}>
+        <option value="">All folders</option>
+        {#each app.snapshot?.folders ?? [] as option (option.id)}
+          {#if option.kind !== 'label'}
+            <option value={option.id}>{option.name || option.kind}</option>
+          {/if}
+        {/each}
+      </select>
+    </div>
+  {/if}
 
   {#if app.error}
     <div class="inline-error" role="alert">
@@ -178,13 +230,13 @@
           </div>
         {/each}
       </div>
-    {:else if app.mails.length === 0}
+    {:else if displayedMails.length === 0}
       <div class="empty">
         <div class="empty-mark" aria-hidden="true">
           <Icon name={folder?.kind ?? 'inbox'} size={26} />
         </div>
-        <h2>{emptyTitle(folder?.kind)}</h2>
-        <p>{emptyBody(folder?.kind)}</p>
+        <h2>{app.searchMode ? 'No matching mail' : emptyTitle(folder?.kind)}</h2>
+        <p>{app.searchMode ? 'Try a different search or clear the filters.' : emptyBody(folder?.kind)}</p>
         {#if folder?.kind === 'inbox' || folder?.kind === 'custom'}
           <button class="btn btn-primary" onclick={() => app.compose('new')}>
             <Icon name="compose" size={15} />
@@ -194,7 +246,7 @@
       </div>
     {:else}
       <VirtualList
-        items={app.mails}
+        items={displayedMails}
         rowHeight={rowHeight()}
         selectedIndex={focusedIndex}
         focusedIndex={localFocus}
@@ -209,11 +261,17 @@
             class:checked={app.selectedIds.includes(mail.id)}
           >
             <div class="avatar-wrap">
-              <Avatar name={mail.sender.name} address={mail.sender.address} size={34} />
+              <Avatar
+                name={app.contactName(mail.sender.address) ?? mail.sender.name}
+                address={mail.sender.address}
+                size={34}
+              />
             </div>
             <div class="content">
               <div class="line">
-                <span class="sender">{senderLabel(mail.sender.name, mail.sender.address)}</span>
+                <span class="sender">
+                  {app.contactName(mail.sender.address) ?? senderLabel(mail.sender.name, mail.sender.address)}
+                </span>
                 {#if mail.confidential}
                   <span class="mini-flag" title="End-to-end encrypted" aria-label="End-to-end encrypted">
                     <Icon name="shield" size={12} />
@@ -308,6 +366,39 @@
     0% { transform: scaleX(0); opacity: 0.8; }
     60% { transform: scaleX(0.7); opacity: 1; }
     100% { transform: scaleX(1); opacity: 0; }
+  }
+  .search-filters {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .filter-chip {
+    padding: 3px 9px;
+    border-radius: var(--radius-pill);
+    background: var(--panel-2);
+    color: var(--muted);
+    font-size: var(--text-xs);
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .filter-chip.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .filter-select {
+    height: 26px;
+    max-width: 160px;
+    margin-left: auto;
+    padding: 0 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--panel-2);
+    color: var(--muted);
+    font-size: 10.5px;
   }
   .bulk {
     display: flex;

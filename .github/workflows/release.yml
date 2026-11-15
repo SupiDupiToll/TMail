@@ -106,6 +106,10 @@ jobs:
 
             ![Palette](${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/docs/review-shots/palette-light.png)
 
+            ### Search
+
+            ![Search](${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/docs/review-shots/search-light.png)
+
             ### Settings
 
             ![Settings](${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/docs/review-shots/settings-light.png)

@@ -50,6 +50,7 @@ pub struct Outgoing {
     pub confidential_password: Option<String>,
     pub sender_name: String,
     pub sender_address: String,
+    pub draft_id: Option<String>,
     pub send_at_ms: Option<i64>,
     /// All enabled addresses of the account (primary + aliases). Used to pick
     /// symmetric key wrapping when sending to the user's own mailbox.
@@ -582,6 +583,7 @@ mod tests {
             confidential_password: None,
             sender_name: "Me".into(),
             sender_address: "me@tuta.com".into(),
+            draft_id: None,
             send_at_ms: None,
             own_addresses: vec!["me@tuta.com".into()],
             previous_message_id: None,

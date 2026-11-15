@@ -109,7 +109,7 @@ protected external mail.
 ## Evidence
 
 - `pnpm -C ui check`: 0 errors, 0 warnings.
-- `pnpm -C ui exec playwright test`: 28 passed, 1 skipped (screenshots).
+- `pnpm -C ui exec playwright test`: 32 passed, 1 skipped (screenshots).
 - `impeccable detect --json ui/src`: 0 findings.
 - `pnpm -C ui test`: 15 passed (sanitiser, hash pin and formatting).
 - `cargo test -p tmail-core`: 58 passed.

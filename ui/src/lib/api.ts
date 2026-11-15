@@ -56,6 +56,12 @@ function mockInvoke(command: string, args?: Record<string, unknown>): unknown {
       return mock.snapshot();
     case 'list_folders':
       return mock.snapshot().folders;
+    case 'load_contacts':
+      return [
+        { name: 'Ada Lovelace', company: 'Analytical', addresses: ['ada@analytical.example'] },
+        { name: 'Grace Hopper', company: 'US Navy', addresses: ['grace@navy.example'] },
+        { name: 'Radia Perlman', company: 'Network', addresses: ['radia@network.example'] }
+      ];
     case 'classify_recipients': {
       const addresses = (args?.addresses as string[] | undefined) ?? [];
       return addresses.map((address) => ({
@@ -69,6 +75,8 @@ function mockInvoke(command: string, args?: Record<string, unknown>): unknown {
       return mock.folder(String(args?.folderId), Number(args?.limit ?? 200));
     case 'open_mail':
       return mock.mail(String(args?.id));
+    case 'load_thread':
+      return mock.thread(String(args?.id));
     case 'search':
       return mock.search(String(args?.query), Number(args?.limit ?? 50));
     case 'set_unread':
@@ -85,6 +93,13 @@ function mockInvoke(command: string, args?: Record<string, unknown>): unknown {
       return null;
     case 'delete_forever':
       mock.remove(args?.ids as string[]);
+      return null;
+    case 'apply_labels':
+      mock.applyLabels(
+        args?.ids as string[],
+        args?.added as string[],
+        args?.removed as string[]
+      );
       return null;
     case 'send_mail':
       return mock.send(args?.draft as DraftInput, args?.attachments as OutgoingAttachment[]);
@@ -155,6 +170,12 @@ export interface SaveAttachmentResult {
   path?: string;
 }
 
+export interface Contact {
+  name: string;
+  company: string;
+  addresses: string[];
+}
+
 export interface LastAccount {
   email: string;
   api_url: string;
@@ -184,11 +205,13 @@ export const api = {
   listFolders: () => invoke<FolderNode[]>('list_folders'),
   classifyRecipients: (addresses: string[]) =>
     invoke<RecipientKind[]>('classify_recipients', { addresses }),
+  loadContacts: () => invoke<Contact[]>('load_contacts'),
   openFolder: (folderId: string, limit = 200) =>
     invoke<MailSummary[]>('open_folder', { folderId, limit }),
   refreshFolder: (folderId: string, limit = 200) =>
     invoke<MailSummary[]>('refresh_folder', { folderId, limit }),
   openMail: (id: string) => invoke<MailDetail>('open_mail', { id }),
+  loadThread: (id: string) => invoke<MailSummary[]>('load_thread', { id }),
   search: (query: string, limit = 50) => invoke<SearchHit[]>('search', { query, limit }),
   setUnread: (ids: string[], unread: boolean) =>
     invoke<void>('set_unread', { ids, unread }),
@@ -198,6 +221,8 @@ export const api = {
   archive: (ids: string[]) => invoke<void>('archive', { ids }),
   deleteForever: (ids: string[], folderId: string) =>
     invoke<void>('delete_forever', { ids, folderId }),
+  applyLabels: (ids: string[], added: string[], removed: string[]) =>
+    invoke<void>('apply_labels', { ids, added, removed }),
   setCurrentFolder: (folderId: string) =>
     invoke<void>('set_current_folder', { folderId }),
   sendMail: (draft: DraftInput, attachments: OutgoingAttachment[]) =>

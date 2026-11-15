@@ -11,6 +11,7 @@ export interface FolderNode {
   name: string;
   kind: string;
   level: number;
+  color: string | null;
 }
 
 export interface MailSummary {
@@ -29,6 +30,7 @@ export interface MailSummary {
   conversation_id: string;
   reply_type: number;
   phishing_status: number;
+  encryption_auth_status: number | null;
 }
 
 export interface AttachmentMeta {
@@ -93,6 +95,7 @@ export interface DraftInput {
   confidential: boolean;
   confidential_password: string | null;
   sender_address: string | null;
+  draft_id: string | null;
   send_at_ms: number | null;
   previous_message_id: string | null;
   conversation_type: number;

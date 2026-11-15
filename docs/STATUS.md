@@ -50,7 +50,7 @@ Done:
   per-sender remote-content choice, attachment previews, command palette,
   Gmail-style composer that expands to a large centred window, expanded local
   settings, keyboard shortcuts, light/dark/system, density.
-- Text-based verification: 28 Playwright tests + 15 Vitest tests pass (axe serious/critical = 0,
+- Text-based verification: 32 Playwright tests + 15 Vitest tests pass (axe serious/critical = 0,
   contrast computed numerically, 800/1280/1440/1920, 1.5 dpr, 200% text,
   sandbox/CSP, keyboard traversal, archive undo).
 - Impeccable detector: 0 findings over `ui/src`.
@@ -78,9 +78,17 @@ state for external recipients.
 ## Phase 4 — Management
 
 Working: move to folder, trash, archive, delete permanently, read/unread,
-bulk selection, local search.
+bulk selection, local FTS search, a full search view with unread/attachment/
+folder filters, labels (apply existing labels), conversation strips from the
+conversation-entry chain, contact names/autocomplete from Tuta contacts, and
+TutaCrypt/RSA/AES trust badges from `EncryptionAuthStatus`.
 
-Missing: label management, inbox rules UI, spam classification UI.
+Partially working: editing an existing draft (text and recipients; the old
+draft is removed after save/send) but no attachment editing or autosave.
+
+Missing: creating/renaming labels, inbox rules UI, spam classification UI,
+contact photos, saved searches, full conversation loading beyond the previous
+chain.
 
 ## Next
 

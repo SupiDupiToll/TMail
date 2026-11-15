@@ -328,3 +328,75 @@ test('mail body uses the available reader width', async ({ page }) => {
   });
   expect(ratio).toBeGreaterThan(0.8);
 });
+
+test('contacts autocomplete, thread strip and encryption badge are visible', async ({ page }) => {
+  await page.goto('/?mock=inbox');
+  await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
+  const list = page.getByRole('listbox', { name: /Inbox messages/ });
+  await list.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { level: 2 })).toBeVisible();
+  await expect(page.locator('.thread-strip').getByRole('button')).toHaveCount(3);
+  await expect(page.getByText('TutaCrypt', { exact: true })).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('c');
+  const composer = page.getByRole('dialog', { name: /New message/ });
+  await expect(composer).toBeVisible();
+  const to = composer.getByLabel('To');
+  await to.fill('Ada');
+  await expect(composer.getByRole('option', { name: /Ada Lovelace/ })).toBeVisible();
+  await composer.getByRole('option', { name: /Ada Lovelace/ }).click();
+  await expect(to).toHaveValue('ada@analytical.example');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Keep editing' }).click();
+  await page.getByRole('button', { name: 'Close composer' }).click();
+  await page.getByRole('button', { name: 'Discard' }).click();
+});
+
+test('full search view filters results and can clear', async ({ page }) => {
+  await page.goto('/?mock=inbox');
+  await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
+  await page.keyboard.press('Control+k');
+  const palette = page.getByRole('dialog', { name: 'Command palette' });
+  await palette.getByRole('combobox').fill('quarterly');
+  await expect(palette.getByText(/Search all mail for/)).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: /Search: quarterly/ })).toBeVisible();
+  const filters = page.locator('.search-filters');
+  await expect(filters.getByRole('button', { name: 'Unread', exact: true })).toBeVisible();
+  await expect(filters.getByRole('button', { name: 'Attachments', exact: true })).toBeVisible();
+  await filters.getByRole('button', { name: 'Unread', exact: true }).click();
+  await page.getByRole('button', { name: 'Clear search' }).click();
+  await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
+});
+
+test('labels can be applied from the reader menu', async ({ page }) => {
+  await page.goto('/?mock=inbox');
+  const list = page.getByRole('listbox', { name: /Inbox messages/ });
+  await expect(list).toBeVisible();
+  await list.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { level: 2 })).toBeVisible();
+  await page.locator('summary[aria-label="More actions"]').click();
+  await page.getByRole('menuitem', { name: 'Urgent', exact: true }).click();
+  await expect(page.getByText('Label added')).toBeVisible();
+});
+
+test('continue editing opens an existing draft', async ({ page }) => {
+  await page.goto('/?mock=inbox');
+  await page.getByRole('button', { name: 'Drafts', exact: true }).click();
+  const list = page.getByRole('listbox', { name: /Drafts messages/ });
+  await expect(list).toBeVisible();
+  await list.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { level: 2 })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue editing' }).click();
+  const composer = page.getByRole('dialog', { name: /Draft/ });
+  await expect(composer).toBeVisible();
+  await expect(composer.getByLabel('Subject')).toHaveValue('Draft: reply to Ada');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Keep editing' }).click();
+  await page.getByRole('button', { name: 'Close composer' }).click();
+  await page.getByRole('button', { name: 'Discard' }).click();
+});

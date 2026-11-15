@@ -44,13 +44,28 @@
     { id: 'logout', label: 'Sign out', icon: 'arrow-left', group: 'App', run: () => app.logout() }
   ]);
 
-  const filtered = $derived(
-    query.trim()
+  const searchAll = $derived<Command[]>(
+    query.trim().length >= 2
+      ? [
+          {
+            id: 'search-all',
+            label: `Search all mail for “${query.trim()}”`,
+            icon: 'search',
+            group: 'Search',
+            run: () => void app.openSearch(query)
+          }
+        ]
+      : []
+  );
+
+  const filtered = $derived([
+    ...searchAll,
+    ...(query.trim()
       ? commands.filter((command) =>
           `${command.label} ${command.group}`.toLowerCase().includes(query.trim().toLowerCase())
         )
-      : commands
-  );
+      : commands)
+  ]);
 
   const total = $derived(filtered.length + hits.length);
 
@@ -95,7 +110,6 @@
 
   function close(): void {
     app.commandOpen = false;
-    app.closeSearch();
   }
 
   function run(index: number): void {

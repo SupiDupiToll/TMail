@@ -94,6 +94,7 @@ pub struct FolderNode {
     pub name: String,
     pub kind: &'static str,
     pub level: usize,
+    pub color: Option<String>,
 }
 
 impl FolderNode {
@@ -131,22 +132,27 @@ impl FolderTree {
 
         let mut system = Vec::new();
         let mut custom = Vec::new();
+        let mut labels = Vec::new();
         for folder in folders {
             match folder.kind() {
                 kind if kind.is_visible_system() => system.push(folder),
                 MailSetKind::Custom if folder.parentFolder.is_none() => custom.push(folder),
-                // Labels and imported sets are not folders in the sidebar.
+                MailSetKind::Label if folder.parentFolder.is_none() => labels.push(folder),
                 _ => {}
             }
         }
         system.sort_by(compare_system);
         custom.sort_by(compare_custom);
+        labels.sort_by(compare_custom);
 
         let mut nodes = Vec::new();
         for folder in system {
             push_subtree(&children, folder, 0, &mut nodes);
         }
         for folder in custom {
+            push_subtree(&children, folder, 0, &mut nodes);
+        }
+        for folder in labels {
             push_subtree(&children, folder, 0, &mut nodes);
         }
         let by_id = nodes
@@ -178,7 +184,7 @@ impl FolderTree {
     #[must_use]
     pub fn default_folder(&self) -> Option<&FolderNode> {
         self.by_kind(MailSetKind::Inbox)
-            .or_else(|| self.nodes.first())
+            .or_else(|| self.nodes.iter().find(|node| node.kind != "label"))
     }
 
     /// Human-readable path, e.g. `Work/Projects`.
@@ -223,6 +229,7 @@ fn push_subtree(
         name: folder.name.clone(),
         kind: folder.kind().key(),
         level,
+        color: folder.color.clone(),
     });
     for child in child_list {
         push_subtree(children, child, level + 1, out);
@@ -302,14 +309,15 @@ mod tests {
     }
 
     #[test]
-    fn labels_and_imported_are_hidden() {
+    fn labels_are_exposed_but_imported_sets_are_hidden() {
         let tree = FolderTree::new(vec![
             set("inbox", MailSetKind::Inbox, "", None),
             set("lbl", MailSetKind::Label, "Work", None),
             set("imp", MailSetKind::Imported, "Imported", None),
         ]);
-        assert_eq!(tree.nodes().len(), 1);
-        assert!(tree.get("lbl").is_none());
+        assert_eq!(tree.nodes().len(), 2);
+        assert_eq!(tree.get("lbl").unwrap().kind, "label");
+        assert!(tree.get("imp").is_none());
     }
 
     #[test]

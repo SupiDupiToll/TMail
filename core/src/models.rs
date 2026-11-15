@@ -51,6 +51,9 @@ pub struct MailSummary {
     pub conversation_id: String,
     pub reply_type: i64,
     pub phishing_status: i64,
+    /// The server's EncryptionAuthStatus for this mail (0 RSA, 1 TutaCrypt
+    /// verified, 2 TutaCrypt failed, 3 AES/external, 4 TutaCrypt sender).
+    pub encryption_auth_status: Option<i64>,
 }
 
 impl MailSummary {
@@ -86,6 +89,7 @@ impl MailSummary {
             conversation_id: mail.conversationEntry.element_id.0.clone(),
             reply_type: mail.replyType,
             phishing_status: mail.phishingStatus,
+            encryption_auth_status: mail.encryptionAuthStatus,
         }
     }
 
@@ -226,6 +230,10 @@ pub struct DraftInput {
     /// Sender address chosen in the composer (must be an enabled alias).
     #[serde(default)]
     pub sender_address: Option<String>,
+    /// Existing server draft being edited; the old draft is removed after a
+    /// successful save/send.
+    #[serde(default)]
+    pub draft_id: Option<String>,
     /// Unix milliseconds for scheduled sending; `None` sends immediately.
     #[serde(default)]
     pub send_at_ms: Option<i64>,

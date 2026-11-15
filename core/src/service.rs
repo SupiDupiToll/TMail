@@ -34,6 +34,13 @@ pub enum SyncEvent {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
+pub struct ContactDto {
+    pub name: String,
+    pub company: String,
+    pub addresses: Vec<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct RecipientKind {
     pub address: String,
     pub internal: bool,
@@ -310,6 +317,61 @@ impl CoreService {
         Ok(())
     }
 
+    pub async fn load_contacts(&self) -> Result<Vec<ContactDto>> {
+        let active = self.active()?;
+        let contacts = active
+            .sdk
+            .contact_facade
+            .load_all_user_contacts()
+            .await
+            .map_err(CoreError::from)?;
+        let mut out = contacts
+            .into_iter()
+            .filter_map(|contact| {
+                let addresses: Vec<String> = contact
+                    .mailAddresses
+                    .iter()
+                    .map(|address| address.address.trim().to_ascii_lowercase())
+                    .filter(|address| !address.is_empty())
+                    .collect();
+                if addresses.is_empty() {
+                    return None;
+                }
+                let parts = [
+                    contact.title.as_deref(),
+                    Some(contact.firstName.as_str()),
+                    contact.middleName.as_deref(),
+                    Some(contact.lastName.as_str()),
+                    contact.nameSuffix.as_deref(),
+                ];
+                let mut name = parts
+                    .into_iter()
+                    .flatten()
+                    .map(str::trim)
+                    .filter(|part| !part.is_empty())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                if name.is_empty() {
+                    name = contact
+                        .nickname
+                        .clone()
+                        .filter(|value| !value.trim().is_empty())
+                        .or_else(|| {
+                            (!contact.company.trim().is_empty()).then(|| contact.company.clone())
+                        })
+                        .unwrap_or_else(|| addresses[0].clone());
+                }
+                Some(ContactDto {
+                    name,
+                    company: contact.company,
+                    addresses,
+                })
+            })
+            .collect::<Vec<_>>();
+        out.sort_by_key(|contact| contact.name.to_lowercase());
+        Ok(out)
+    }
+
     pub async fn classify_recipients(&self, addresses: Vec<String>) -> Result<Vec<RecipientKind>> {
         let active = self.active()?;
         let kinds = crate::send::classify_recipients(&active.sdk, &addresses).await?;
@@ -461,6 +523,43 @@ impl CoreService {
         }
     }
 
+    pub async fn load_thread(&self, mail_id: &str) -> Result<Vec<MailSummary>> {
+        let active = self.active()?;
+        let id = parse_id(mail_id)?;
+        let client = active.sdk.mail_facade().get_crypto_entity_client();
+        let mail: Mail = client.load(&id).await.map_err(CoreError::from)?;
+        let mut entry_id = mail.conversationEntry.clone();
+        let mut seen = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        for _ in 0..50 {
+            if !seen.insert(format!("{}/{}", entry_id.list_id.0, entry_id.element_id.0)) {
+                break;
+            }
+            let entry: tuta_sdk::entities::generated::tutanota::ConversationEntry =
+                match client.load(&entry_id).await {
+                    Ok(entry) => entry,
+                    Err(_) => break,
+                };
+            if let Some(thread_mail_id) = &entry.mail {
+                if let Ok(thread_mail) = client.load::<Mail, _>(thread_mail_id).await {
+                    let summary = MailSummary::from_mail(&thread_mail);
+                    if !out
+                        .iter()
+                        .any(|existing: &MailSummary| existing.id == summary.id)
+                    {
+                        out.push(summary);
+                    }
+                }
+            }
+            let Some(previous) = entry.previous else {
+                break;
+            };
+            entry_id = previous;
+        }
+        out.sort_by_key(|summary| summary.received_ms);
+        Ok(out)
+    }
+
     pub async fn download_attachment(&self, mail_id: &str, attachment_id: &str) -> Result<Vec<u8>> {
         let active = self.active()?;
         let id = parse_id(mail_id)?;
@@ -552,6 +651,46 @@ impl CoreService {
         self.move_mails(ids, &target).await
     }
 
+    pub async fn apply_labels(
+        &self,
+        mail_ids: Vec<String>,
+        added: Vec<String>,
+        removed: Vec<String>,
+    ) -> Result<()> {
+        let active = self.active()?;
+        let mails = mail_ids
+            .iter()
+            .map(|id| parse_id(id))
+            .collect::<Result<Vec<_>>>()?;
+        let resolve = |ids: Vec<String>| -> Result<Vec<IdTupleGenerated>> {
+            ids.iter()
+                .map(|id| {
+                    active
+                        .folder(id)
+                        .map(|folder| id_tuple(&folder))
+                        .ok_or(CoreError::NotFound)
+                })
+                .collect()
+        };
+        let added_labels = resolve(added)?;
+        let removed_labels = resolve(removed)?;
+        active
+            .sdk
+            .get_service_executor()
+            .post::<tuta_sdk::services::generated::tutanota::ApplyLabelService>(
+                tuta_sdk::entities::generated::tutanota::ApplyLabelServicePostIn {
+                    _format: 0,
+                    mails,
+                    addedLabels: added_labels,
+                    removedLabels: removed_labels,
+                },
+                Default::default(),
+            )
+            .await
+            .map_err(CoreError::from)?;
+        Ok(())
+    }
+
     pub async fn delete_forever(&self, ids: &[String], folder_id: &str) -> Result<()> {
         let active = self.active()?;
         let folder = active.folder(folder_id).ok_or(CoreError::NotFound)?;
@@ -584,6 +723,7 @@ impl CoreService {
             confidential_password: draft.confidential_password,
             sender_name: active.display_name.clone(),
             sender_address: sender,
+            draft_id: draft.draft_id.clone(),
             send_at_ms: draft.send_at_ms,
             own_addresses: active.sender_addresses.clone(),
             previous_message_id: draft.previous_message_id,
@@ -597,7 +737,11 @@ impl CoreService {
                 })
                 .collect(),
         };
+        let old_draft = outgoing.draft_id.clone();
         let (message_id, draft_id) = send(&active.sdk, &outgoing).await?;
+        if let Some(old) = old_draft {
+            let _ = self.delete_draft(&active, &old).await;
+        }
         if let Some(sent) = active.tree.read().ok().and_then(|tree| {
             tree.by_kind(crate::folders::MailSetKind::Sent)
                 .map(|f| f.id.clone())
@@ -631,6 +775,7 @@ impl CoreService {
             confidential_password: draft.confidential_password,
             sender_name: active.display_name.clone(),
             sender_address: sender,
+            draft_id: draft.draft_id.clone(),
             send_at_ms: draft.send_at_ms,
             own_addresses: active.sender_addresses.clone(),
             previous_message_id: draft.previous_message_id,
@@ -644,7 +789,29 @@ impl CoreService {
                 })
                 .collect(),
         };
-        crate::send::save_draft(&active.sdk, &outgoing).await
+        let old_draft = outgoing.draft_id.clone();
+        let new_id = crate::send::save_draft(&active.sdk, &outgoing).await?;
+        if let Some(old) = old_draft {
+            let _ = self.delete_draft(&active, &old).await;
+        }
+        Ok(new_id)
+    }
+
+    async fn delete_draft(&self, active: &Active, id: &str) -> Result<()> {
+        let folder = active
+            .tree
+            .read()
+            .ok()
+            .and_then(|tree| {
+                tree.by_kind(crate::folders::MailSetKind::Draft)
+                    .map(|f| f.id.clone())
+            })
+            .ok_or(CoreError::NotFound)?;
+        let folder = active.folder(&folder).ok_or(CoreError::NotFound)?;
+        active
+            .mail
+            .delete_mails(vec![parse_id(id)?], id_tuple(&folder))
+            .await
     }
 
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>> {

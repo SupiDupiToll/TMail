@@ -27,7 +27,8 @@ const folders: FolderNode[] = [
   folder('spam', 'Spam', 'spam', 0, 5),
   folder('work', 'Work', 'custom', 0, 6),
   folder('projects', 'Projects', 'custom', 1, 7, 'work'),
-  folder('receipts', 'Receipts', 'custom', 0, 8)
+  folder('receipts', 'Receipts', 'custom', 0, 8),
+  folder('urgent', 'Urgent', 'label', 0, 9)
 ];
 
 function folder(
@@ -45,7 +46,8 @@ function folder(
     parent_id: parent,
     name,
     kind,
-    level
+    level,
+    color: kind === 'label' ? '#7d5310' : null
   };
 }
 
@@ -147,12 +149,13 @@ for (let i = 0; i < 240; i++) {
     unread: i < 9 || i % 17 === 0,
     has_attachments: attachmentCount > 0,
     attachment_count: attachmentCount,
-    confidential: i % 31 === 0,
+    confidential: i === 7 || i % 31 === 0,
     is_draft: false,
     folder_ids: [i % 11 === 0 ? 'archive' : i % 13 === 0 ? 'trash' : i % 5 === 0 ? 'work' : 'inbox'],
     conversation_id: `conv-${i}`,
     reply_type: i % 3,
-    phishing_status: i === 1 ? 3 : 0
+    phishing_status: i === 1 ? 3 : 0,
+    encryption_auth_status: i === 7 || i % 2 === 0 ? 1 : 0
   };
   mails.push(summary);
 
@@ -207,7 +210,8 @@ for (let i = 0; i < 2; i++) {
     folder_ids: ['drafts'],
     conversation_id: `draft-conv-${i}`,
     reply_type: 0,
-    phishing_status: i === 1 ? 3 : 0
+    phishing_status: i === 1 ? 3 : 0,
+    encryption_auth_status: i === 7 || i % 2 === 0 ? 1 : 0
   };
   mails.push(summary);
   details.set(id, {
@@ -265,6 +269,16 @@ export const mock = {
     return summaryForFolder(folderId).slice(0, limit);
   },
 
+  thread(id: string): MailSummary[] {
+    const current = mails.find((mail) => mail.id === id);
+    if (!current) return [];
+    const related = mails
+      .filter((mail) => mail.sender.address === current.sender.address)
+      .slice(0, 3)
+      .sort((a, b) => a.received_ms - b.received_ms);
+    return related.some((mail) => mail.id === id) ? related : [current, ...related.slice(0, 2)];
+  },
+
   mail(id: string): MailDetail {
     const detail = details.get(id);
     if (!detail) throw new Error('not found');
@@ -314,6 +328,16 @@ export const mock = {
     }
   },
 
+  applyLabels(ids: string[], added: string[], removed: string[]) {
+    for (const mail of mails) {
+      if (!ids.includes(mail.id)) continue;
+      mail.folder_ids = mail.folder_ids.filter((id) => !removed.includes(id));
+      for (const label of added) {
+        if (!mail.folder_ids.includes(label)) mail.folder_ids.push(label);
+      }
+    }
+  },
+
   send(draft: DraftInput, attachments: OutgoingAttachment[]) {
     const id = `list-sent/${Date.now()}`;
     const summary: MailSummary = {
@@ -331,7 +355,8 @@ export const mock = {
       folder_ids: ['sent'],
       conversation_id: `sent-${Date.now()}`,
       reply_type: 0,
-      phishing_status: 0
+      phishing_status: 0,
+      encryption_auth_status: 4
     };
     mails.unshift(summary);
     details.set(id, {
@@ -368,7 +393,8 @@ export const mock = {
       folder_ids: ['drafts'],
       conversation_id: `draft-${Date.now()}`,
       reply_type: 0,
-      phishing_status: 0
+      phishing_status: 0,
+      encryption_auth_status: null
     };
     savedDrafts = [summary, ...savedDrafts];
     return id;

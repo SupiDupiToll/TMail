@@ -521,6 +521,7 @@ mod tests {
             conversation_id: "conv".into(),
             reply_type: 0,
             phishing_status: 0,
+            encryption_auth_status: None,
         }
     }
 

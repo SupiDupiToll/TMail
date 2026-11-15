@@ -4,6 +4,7 @@
   import { formatBytes } from '../format';
   import { isTutaAddress, splitAddresses } from '../addresses';
   import Icon from './Icon.svelte';
+  import ContactSuggestions from './ContactSuggestions.svelte';
 
   let dialog = $state<HTMLDialogElement | null>(null);
   let toInput = $state<HTMLInputElement | null>(null);
@@ -26,6 +27,9 @@
   let recipientKinds = $state<Record<string, boolean>>({});
   let checkingRecipients = $state(false);
   let checkFailed = $state(false);
+  let toFocused = $state(false);
+  let ccFocused = $state(false);
+  let bccFocused = $state(false);
 
   const lookupKey = $derived(
     recipients
@@ -87,6 +91,24 @@
       dialog.close();
     }
   });
+
+  function lastRecipientToken(value: string): string {
+    return value.split(/[,;\n]/).pop()?.trim() ?? '';
+  }
+
+  function addRecipient(field: 'to' | 'cc' | 'bcc', address: string): void {
+    const current = composer[field];
+    const parts = current
+      .split(/[,;\n]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length > 0) parts[parts.length - 1] = address;
+    else parts.push(address);
+    app.updateComposer({ [field]: parts.join(', ') });
+    if (field === 'to') toFocused = false;
+    if (field === 'cc') ccFocused = false;
+    if (field === 'bcc') bccFocused = false;
+  }
 
   function close(): void {
     if (composer.busy) return;
@@ -259,7 +281,22 @@
       </div>
       <div class="field-row">
         <label class="field-label" for="compose-to">To</label>
-        <input id="compose-to" bind:this={toInput} class="bare-input" bind:value={composer.to} placeholder="name@example.com" autocomplete="off" />
+        <input
+          id="compose-to"
+          bind:this={toInput}
+          class="bare-input"
+          bind:value={composer.to}
+          placeholder="name@example.com"
+          autocomplete="off"
+          onfocus={() => (toFocused = true)}
+          onblur={() => setTimeout(() => (toFocused = false), 140)}
+        />
+        <ContactSuggestions
+          contacts={app.contacts}
+          query={lastRecipientToken(composer.to)}
+          open={toFocused}
+          onPick={(address) => addRecipient('to', address)}
+        />
         <button class="mini-link" type="button" onclick={() => app.updateComposer({ showCc: !composer.showCc })}>
           {composer.showCc ? 'Hide' : 'Cc/Bcc'}
         </button>
@@ -267,11 +304,39 @@
       {#if composer.showCc}
         <div class="field-row">
           <label class="field-label" for="compose-cc">Cc</label>
-          <input id="compose-cc" class="bare-input" bind:value={composer.cc} placeholder="Optional" autocomplete="off" />
+          <input
+            id="compose-cc"
+            class="bare-input"
+            bind:value={composer.cc}
+            placeholder="Optional"
+            autocomplete="off"
+            onfocus={() => (ccFocused = true)}
+            onblur={() => setTimeout(() => (ccFocused = false), 140)}
+          />
+          <ContactSuggestions
+            contacts={app.contacts}
+            query={lastRecipientToken(composer.cc)}
+            open={ccFocused}
+            onPick={(address) => addRecipient('cc', address)}
+          />
         </div>
         <div class="field-row">
           <label class="field-label" for="compose-bcc">Bcc</label>
-          <input id="compose-bcc" class="bare-input" bind:value={composer.bcc} placeholder="Optional" autocomplete="off" />
+          <input
+            id="compose-bcc"
+            class="bare-input"
+            bind:value={composer.bcc}
+            placeholder="Optional"
+            autocomplete="off"
+            onfocus={() => (bccFocused = true)}
+            onblur={() => setTimeout(() => (bccFocused = false), 140)}
+          />
+          <ContactSuggestions
+            contacts={app.contacts}
+            query={lastRecipientToken(composer.bcc)}
+            open={bccFocused}
+            onPick={(address) => addRecipient('bcc', address)}
+          />
         </div>
       {/if}
       <div class="field-row">
@@ -460,6 +525,7 @@
     padding: 4px 18px 0;
   }
   .field-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;

@@ -21,6 +21,25 @@
   const allowRemote = $derived(
     detail ? app.isRemoteAllowed(detail.summary.sender.address) : false
   );
+  const encryption = $derived.by(() => {
+    const summary = detail?.summary;
+    if (!summary?.confidential) return null;
+    switch (summary.encryption_auth_status) {
+      case 1:
+        return { label: 'TutaCrypt', title: 'TutaCrypt sender authenticated (post-quantum)' };
+      case 4:
+        return { label: 'TutaCrypt', title: 'Sent with TutaCrypt (post-quantum)' };
+      case 2:
+        return { label: 'TutaCrypt unverified', title: 'TutaCrypt authentication FAILED — treat with caution', danger: true };
+      case 0:
+        return { label: 'RSA encrypted', title: 'Legacy RSA encryption (no TutaCrypt authentication)' };
+      case 3:
+        return { label: 'Encrypted', title: 'Encrypted with a shared password or external AES key' };
+      default:
+        return { label: 'Encrypted', title: 'End-to-end encrypted' };
+    }
+  });
+
   const visibleAttachments = $derived(
     (detail?.attachments ?? []).filter((attachment) => !attachment.is_inline)
   );
@@ -95,7 +114,11 @@
   });
 
   function mailtoLabel(): string {
-    return detail ? senderLabel(detail.summary.sender.name, detail.summary.sender.address) : '';
+    if (!detail) return '';
+    return (
+      app.contactName(detail.summary.sender.address) ??
+      senderLabel(detail.summary.sender.name, detail.summary.sender.address)
+    );
   }
 
   function recipientsLine(): string {
@@ -131,12 +154,35 @@
     </div>
   {:else}
     <header class="reader-head">
+      {#if app.thread.length > 1}
+        <div class="thread-strip" role="group" aria-label="Conversation">
+          {#each app.thread as item (item.id)}
+            <button
+              class="thread-item"
+              class:active={item.id === detail.summary.id}
+              title={item.subject}
+              onclick={() => app.openMail(item.id)}
+            >
+              <span class="thread-sender">
+                {app.contactName(item.sender.address) ?? senderLabel(item.sender.name, item.sender.address)}
+              </span>
+              <span class="thread-subject">{item.subject}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+
       <div class="subject-row">
         <button class="icon-btn back-btn" aria-label="Back to message list" onclick={() => onBack?.()}>
           <Icon name="arrow-left" size={17} />
         </button>
         <h2 title={detail.summary.subject}>{detail.summary.subject}</h2>
         <div class="actions" role="toolbar" aria-label="Message actions">
+          {#if detail.summary.is_draft}
+            <button class="btn btn-sm" onclick={() => app.editDraft(detail)}>
+              Continue editing
+            </button>
+          {/if}
           <button class="icon-btn" aria-label="Reply" title="Reply (r)" onclick={() => app.compose('reply')}>
             <Icon name="reply" size={17} />
           </button>
@@ -174,6 +220,25 @@
                   </button>
                 {/if}
               {/each}
+              {#if app.labels().length > 0}
+                <hr />
+                {#each app.labels() as label (label.id)}
+                  <button
+                    role="menuitem"
+                    onclick={() => {
+                      moreMenu && (moreMenu.open = false);
+                      const has = detail.summary.folder_ids.includes(label.id);
+                      app.toggleLabel(detail.summary.id, label.id, !has);
+                    }}
+                  >
+                    <span class="label-swatch" style:background={label.color ?? 'var(--brass)'}></span>
+                    {label.name}
+                    {#if detail.summary.folder_ids.includes(label.id)}
+                      <Icon name="check" size={13} />
+                    {/if}
+                  </button>
+                {/each}
+              {/if}
               <hr />
               <button role="menuitem" class="danger" onclick={() => { moreMenu && (moreMenu.open = false); app.deleteForever([detail.summary.id]); }}>
                 <Icon name="trash" size={14} />
@@ -185,13 +250,24 @@
       </div>
 
       <div class="meta-row">
-        <Avatar name={detail.summary.sender.name} address={detail.summary.sender.address} size={34} />
+        <Avatar
+          name={app.contactName(detail.summary.sender.address) ?? detail.summary.sender.name}
+          address={detail.summary.sender.address}
+          size={34}
+        />
         <div class="meta">
           <div class="meta-line">
             <span class="sender">{mailtoLabel()}</span>
             <span class="address">&lt;{detail.summary.sender.address}&gt;</span>
-            {#if detail.summary.confidential}
-              <span class="chip chip-accent"><Icon name="shield" size={11} /> Confidential</span>
+            {#if encryption}
+              <span
+                class="chip chip-accent"
+                class:chip-danger={encryption.danger}
+                title={encryption.title}
+              >
+                <Icon name="shield" size={11} />
+                {encryption.label}
+              </span>
             {/if}
           </div>
           <div class="meta-line faint tiny">
@@ -297,6 +373,44 @@
     background: var(--panel);
     overflow-y: auto;
     max-height: 58vh;
+  }
+  .thread-strip {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    margin: -4px 0 12px;
+    padding-bottom: 2px;
+  }
+  .thread-item {
+    display: flex;
+    flex-direction: column;
+    min-width: 140px;
+    max-width: 220px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--panel-2);
+    text-align: left;
+    color: var(--muted);
+    flex: none;
+  }
+  .thread-item.active {
+    border-color: var(--selected-border);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .thread-sender {
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .thread-subject {
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .subject-row {
     display: flex;
@@ -575,6 +689,12 @@
   .menu-pop button:hover,
   .menu-pop button:focus-visible {
     background: var(--hover-bg);
+  }
+  .label-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex: none;
   }
   .menu-pop button.danger {
     color: var(--danger);

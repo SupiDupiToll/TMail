@@ -171,6 +171,13 @@ pub async fn logout(state: State<'_, AppState>) -> ApiResult<()> {
 }
 
 #[tauri::command]
+pub async fn load_contacts(
+    state: State<'_, AppState>,
+) -> ApiResult<Vec<tmail_core::service::ContactDto>> {
+    state.service.load_contacts().await.map_err(ApiError::from)
+}
+
+#[tauri::command]
 pub async fn classify_recipients(
     state: State<'_, AppState>,
     addresses: Vec<String>,
@@ -276,6 +283,20 @@ pub async fn archive(state: State<'_, AppState>, ids: Vec<String>) -> ApiResult<
 }
 
 #[tauri::command]
+pub async fn apply_labels(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+    added: Vec<String>,
+    removed: Vec<String>,
+) -> ApiResult<()> {
+    state
+        .service
+        .apply_labels(ids, added, removed)
+        .await
+        .map_err(ApiError::from)
+}
+
+#[tauri::command]
 pub async fn delete_forever(
     state: State<'_, AppState>,
     ids: Vec<String>,
@@ -364,6 +385,11 @@ pub struct AttachmentData {
     mime_type: String,
     /// Standard base64 of the decrypted attachment bytes.
     data: String,
+}
+
+#[tauri::command]
+pub async fn load_thread(state: State<'_, AppState>, id: String) -> ApiResult<Vec<MailSummary>> {
+    state.service.load_thread(&id).await.map_err(ApiError::from)
 }
 
 #[tauri::command]

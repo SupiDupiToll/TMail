@@ -11,9 +11,12 @@
 
   const folders = $derived(app.snapshot?.folders ?? []);
   const systemFolders = $derived(
-    folders.filter((folder) => folder.level === 0 && folder.kind !== 'custom')
+    folders.filter(
+      (folder) => folder.level === 0 && folder.kind !== 'custom' && folder.kind !== 'label'
+    )
   );
   const customFolders = $derived(folders.filter((folder) => folder.kind === 'custom'));
+  const labels = $derived(folders.filter((folder) => folder.kind === 'label'));
 
   function unreadFor(folder: FolderNode): number {
     return app.snapshot?.unread.find((entry) => entry.folder_id === folder.id)?.unread ?? 0;
@@ -80,6 +83,29 @@
         {/if}
       </button>
     {/each}
+
+    {#if labels.length > 0}
+      <div class="section-label">Labels</div>
+      {#each labels as label (label.id)}
+        <button
+          class="folder label-row"
+          class:active={app.selectedFolderId === label.id}
+          aria-current={app.selectedFolderId === label.id ? 'page' : undefined}
+          onclick={() => select(label)}
+          title={label.name}
+        >
+          <span
+            class="label-dot"
+            style:background={label.color ?? 'var(--brass)'}
+            aria-hidden="true"
+          ></span>
+          <span class="folder-name">{label.name}</span>
+          {#if unreadFor(label) > 0}
+            <span class="badge tabular" aria-label={`${unreadFor(label)} unread`}>{unreadFor(label)}</span>
+          {/if}
+        </button>
+      {/each}
+    {/if}
 
     {#if customFolders.length > 0}
       <div class="section-label">Folders</div>
@@ -215,6 +241,16 @@
     background: var(--accent-soft);
     color: var(--accent);
     font-weight: 720;
+  }
+  .label-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex: none;
+  }
+  :global([data-sidebar='collapsed']) .label-row .label-dot {
+    width: 12px;
+    height: 12px;
   }
   .folder-name {
     flex: 1;

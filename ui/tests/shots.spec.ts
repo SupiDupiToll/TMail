@@ -51,7 +51,11 @@ test('capture review screens', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Search mail or run a command' })).toBeVisible();
   await shot(page, 'palette-light');
-  await page.keyboard.press('Escape');
+  await page.getByRole('combobox', { name: 'Search mail or run a command' }).fill('quarterly');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: /Search: quarterly/ })).toBeVisible();
+  await shot(page, 'search-light');
+  await page.getByRole('button', { name: 'Clear search' }).click();
 
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible();
