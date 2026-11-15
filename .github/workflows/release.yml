@@ -86,6 +86,18 @@ jobs:
           releaseBody: |
             **TMail ${{ github.ref_name }}** — an unofficial desktop client for Tuta Mail.
 
+            ### Screenshots
+
+            Synthetic demo mailbox; no real account content.
+
+            | Inbox | Reader |
+            |---|---|
+            | ![Inbox](${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/docs/review-shots/inbox-light.png) | ![Reader](${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/docs/review-shots/reader-light.png) |
+            | **Composer** | **Command palette** |
+            | ![Composer](${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/docs/review-shots/composer-light.png) | ![Palette](${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/docs/review-shots/palette-light.png) |
+            | **Settings** | **Dark theme** |
+            | ![Settings](${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/docs/review-shots/settings-light.png) | ![Dark inbox](${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/docs/review-shots/inbox-dark.png) |
+
             Packages:
             - Linux: `.deb`, `.rpm`, `.AppImage` (x86_64)
             - Windows: `.exe` (NSIS installer), `.msi`
