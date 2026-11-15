@@ -37,6 +37,7 @@ deliberately out of scope.
 | Mail | In-app attachment preview | **MVP** | images and text; PDFs open externally |
 | Mail | Keyboard-first triage | **MVP** | `j/k`, `u`, `e`, `#`, `r`, `a`, `f`, `Ctrl+K` |
 | Desktop | Collapsible rail + resizable columns | **MVP** | drag or arrow keys; persists |
+| Desktop | Signed in-app updates | **MVP** | AppImage, Windows, macOS; `.deb`/RPM/Arch use package manager |
 | Contacts | Address book, autocomplete | partial | names, companies and recipient suggestions; contact photos later |
 | Calendar | View/edit events | later | SDK calendar facade exists |
 | Settings | Theme follows system | **MVP** | |

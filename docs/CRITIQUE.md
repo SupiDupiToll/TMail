@@ -101,6 +101,8 @@ protected external mail.
   net; notifications respect focus/hidden state, appear once, carry the TMail
   icon and an "Open email" action. Mail links are forwarded from the frame
   bootstrap, so they work inline even when WebKit denies direct document access.
+- Updates are signed and scoped to AppImage/Windows/macOS; package-managed
+  Linux installations are never updated behind the package manager's back.
 - Keyboard flow (`j/k`, `Enter`, `u/e/#`, `r/a/f`, `Ctrl+K`, `g` sequences) is
   coherent and discoverable through the palette and help sheet.
 - The encrypted-cache/session/keyring story is visible in settings and errors,

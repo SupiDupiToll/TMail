@@ -43,7 +43,9 @@ editing in place.
 Done:
 
 - Tauri 2 shell: window, tray with close-to-tray fallback, single instance,
-  notifications, native save dialog, `mailto:` cold start, window state.
+  notifications, native save dialog, `mailto:` cold start, window state, and a
+  signed in-app updater for AppImage/Windows/macOS (package-managed Linux
+  installs use their package manager).
 - Svelte 5 UI: three-pane quiet-workspace layout, virtualised avatar list with
   no timestamps, collapsible icon rail with a visible expand control and
   resizable columns, reader with sandboxed HTML and a light mail canvas,
