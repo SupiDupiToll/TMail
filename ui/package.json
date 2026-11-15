@@ -1,7 +1,7 @@
 {
   "name": "@tmail/ui",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "license": "GPL-3.0-or-later",
   "scripts": {
@@ -18,7 +18,9 @@
     "@tauri-apps/plugin-notification": "^2.3.0",
     "@tauri-apps/plugin-opener": "^2.5.0",
     "dompurify": "^3.2.7",
-    "css-tree": "^3.1.0"
+    "css-tree": "^3.1.0",
+    "@tauri-apps/plugin-updater": "^2.9.0",
+    "@tauri-apps/plugin-process": "^2.3.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",

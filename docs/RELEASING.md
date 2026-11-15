@@ -18,8 +18,8 @@ without a tag, and every release starts as a **draft** for review.
    ```
 3. Commit and push, then tag:
    ```bash
-   git tag v0.2.0
-   git push origin v0.2.0
+   git tag v0.2.1
+   git push origin v0.2.1
    ```
 4. Open the **Actions → Release** run. It builds in parallel:
    - Ubuntu 22.04: `.deb`, `.rpm`, `.AppImage` (x86_64, glibc 2.35+)
@@ -42,21 +42,38 @@ The workflow is in [`.github/workflows/release.yml`](../.github/workflows/releas
 
 The AppImage does not bundle WebKitGTK. It uses the system engine.
 
-## Signing
+## Signing and in-app updates
 
-The workflow currently produces **unsigned** builds and says so in the release
-body. This is deliberate: an unsigned build must not look signed.
+The workflow produces **unsigned OS installers** and says so in the release
+body, but update artifacts are signed with the Tauri updater key:
 
-To add signing later:
+- Public key: in `src-tauri/tauri.conf.json` under `plugins.updater.pubkey`.
+- Private key: generated locally at `~/.tauri/tmail-updater.key` (mode 0600);
+  keep a secure backup and never commit it.
+- Password: `~/.tauri/tmail-updater.password`.
+- GitHub repository secrets:
+  - `TAURI_SIGNING_PRIVATE_KEY`
+  - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
 
-- **Tauri updater/signing:** create `TAURI_SIGNING_PRIVATE_KEY` and
-  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets and add updater
-  artifacts to the Tauri config.
+The workflow builds `latest.json` and the `.sig` files, uploads them to the
+release, and TMail checks:
+
+```text
+https://github.com/SupiDupiToll/TMail/releases/latest/download/latest.json
+```
+
+Only **published** releases are visible to the updater. Draft releases are not.
+The updater is enabled for **AppImage, Windows and macOS**; `.deb`, `.rpm` and
+distribution packages are updated by the package manager. The settings sheet
+detects this and disables in-app updates for package-managed Linux installs.
+
+OS code signing (Windows Authenticode, macOS notarization) remains separate:
+
 - **Windows:** add a code-signing certificate and `signtool` configuration.
 - **macOS:** add `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`,
   `APPLE_SIGNING_IDENTITY` and notarization credentials.
 
-Do not enable signing without testing the resulting artifact on a clean
+Do not enable OS signing without testing the resulting artifact on a clean
 machine.
 
 ## Local packaging check

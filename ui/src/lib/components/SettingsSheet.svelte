@@ -256,6 +256,56 @@
         </div>
       </section>
 
+      <section class="group" aria-labelledby="updates-label">
+        <h3 id="updates-label">Updates</h3>
+        <div class="setting">
+          <div class="setting-copy">
+            <span class="setting-name">TMail {app.info?.version ?? ''}</span>
+            <span class="setting-help">
+              {#if app.info?.update_mode === 'package_manager'}
+                This installation is managed by your package manager.
+              {:else if app.info?.update_mode === 'none'}
+                In-app updates are unavailable in this preview.
+              {:else}
+                Signed updates from the TMail GitHub releases.
+              {/if}
+            </span>
+          </div>
+          {#if app.info?.update_mode === 'package_manager'}
+            <button class="btn btn-sm" onclick={() => openExternal('https://github.com/SupiDupiToll/TMail/releases')}>
+              Releases
+            </button>
+          {:else if app.info?.update_mode === 'appimage' || app.info?.update_mode === 'native'}
+            <button
+              class="btn btn-sm"
+              disabled={app.checkingUpdate || app.installingUpdate}
+              onclick={() => app.checkForUpdates(true)}
+            >
+              {app.checkingUpdate ? 'Checking…' : 'Check for updates'}
+            </button>
+          {/if}
+        </div>
+        {#if app.updateAvailable}
+          <div class="update-box">
+            <strong>Version {app.updateAvailable.version} is available</strong>
+            {#if app.updateAvailable.body}<p>{app.updateAvailable.body}</p>{/if}
+            {#if app.installingUpdate}
+              <div class="update-progress">
+                <span class="spinner"></span>
+                {app.updateProgress === null ? 'Installing…' : `Installing… ${app.updateProgress}%`}
+              </div>
+            {:else}
+              <button class="btn btn-sm btn-primary" onclick={() => app.installUpdate()}>
+                Install and restart
+              </button>
+            {/if}
+          </div>
+        {/if}
+        {#if app.updateError}
+          <p class="update-error" role="alert">{app.updateError}</p>
+        {/if}
+      </section>
+
       <section class="group" aria-labelledby="about-label">
         <h3 id="about-label">About</h3>
         <div class="about">
@@ -461,6 +511,39 @@
   }
   .mini-btn:hover {
     background: var(--accent-soft);
+  }
+  .update-box {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0 2px;
+    padding: 10px 12px;
+    border: 1px solid var(--selected-border);
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: var(--text-xs);
+    line-height: 1.45;
+  }
+  .update-box p {
+    color: var(--text);
+    max-height: 100px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  .update-box .btn {
+    align-self: flex-start;
+    margin-top: 2px;
+  }
+  .update-progress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .update-error {
+    margin: 6px 0 2px;
+    color: var(--danger);
+    font-size: var(--text-xs);
   }
   .server-note {
     display: flex;

@@ -42,7 +42,8 @@ function mockInvoke(command: string, args?: Record<string, unknown>): unknown {
         version: '0.1.0-mock',
         product: 'TMail (unofficial, preview)',
         api_url: 'https://app.tuta.com',
-        mock: true
+        mock: true,
+        update_mode: 'none'
       };
     case 'resume':
       return mock.signedIn ? mock.snapshot() : null;
@@ -163,6 +164,7 @@ export interface AppInfo {
   product: string;
   api_url: string;
   mock: boolean;
+  update_mode: 'appimage' | 'native' | 'package_manager' | 'none';
 }
 
 export interface SaveAttachmentResult {

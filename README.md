@@ -69,7 +69,7 @@ reader that never loads a tracking pixel by itself.
 | **Find and understand** | Full search view with filters, conversation strips, contact autocomplete and trust badges for TutaCrypt/RSA/AES. |
 | **Encryption without rituals** | Automatic E2E for Tuta recipients, including **Tuta-hosted custom domains**. No manual “confidential” checkbox for Tuta users. |
 | **Compose that fits a desktop** | Sender aliases, scheduled send, attachments, image/text previews, plain-text mode, signature, Gmail-style composer. |
-| **Quiet by default** | No telemetry, no analytics, no update pings. The network allowlist only permits Tuta-owned hosts. |
+| **Quiet by default** | No telemetry or analytics. Mail traffic only goes to Tuta hosts; the optional signed updater contacts GitHub Releases. |
 | **Yours to keep** | GPL-3.0-or-later, reproducible Rust/pnpm locks, packages for your distro and plain source builds. |
 
 TMail does **not** replace everything in the official client yet. Missing:
@@ -273,8 +273,8 @@ The release workflow lives in
 [`.github/workflows/release.yml`](.github/workflows/release.yml). Push a tag:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 GitHub Actions builds on Ubuntu 24.04, Windows and macOS (universal), creates a
@@ -300,7 +300,8 @@ be signed.
 - **Links:** the frame forwards clicks through a hash-pinned bootstrap to the
   trusted parent; the parent opens them with the system browser.
 - **Network:** Tuta-owned host allowlist, bounded concurrency and backoff on
-  429/5xx. No telemetry or crash reporting.
+  429/5xx. The optional signed updater contacts GitHub Releases; package-managed
+  Linux installs use their package manager. No telemetry or crash reporting.
 - **Attachments:** decrypted only on demand; image/text previews stay in-app,
   everything else is saved through the native dialog.
 

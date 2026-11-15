@@ -49,6 +49,8 @@ pub struct AppInfo {
     product: String,
     api_url: String,
     mock: bool,
+    /// `appimage`, `native` or `package_manager`.
+    update_mode: String,
 }
 
 fn notification_icon(app: &AppHandle) -> Option<String> {
@@ -92,7 +94,24 @@ pub fn app_info(state: State<'_, AppState>) -> AppInfo {
         product: tmail_core::PRODUCT_NAME.to_string(),
         api_url: state.service.api_url().to_string(),
         mock: false,
+        update_mode: update_mode(),
     }
+}
+
+fn update_mode() -> String {
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("APPIMAGE").is_some() {
+            return "appimage".into();
+        }
+        return "package_manager".into();
+    }
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    {
+        return "native".into();
+    }
+    #[allow(unreachable_code)]
+    "none".into()
 }
 
 #[derive(Serialize)]

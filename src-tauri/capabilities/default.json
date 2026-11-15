@@ -16,6 +16,8 @@
     "opener:default",
     "window-state:default",
     "core:window:allow-is-visible",
-    "core:window:allow-is-focused"
+    "core:window:allow-is-focused",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

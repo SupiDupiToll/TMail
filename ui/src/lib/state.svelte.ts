@@ -207,7 +207,8 @@ export class MailApp {
         version: 'unknown',
         product: 'TMail',
         api_url: '',
-        mock: isMock
+        mock: isMock,
+        update_mode: 'none'
       };
     }
     this.applyTheme(this.theme);
@@ -239,6 +240,7 @@ export class MailApp {
     }
 
     this.startInboxWatch();
+    window.setTimeout(() => void this.checkForUpdates(false), 2500);
     let lastEmail = getString('tmail.last-email') || (isMock ? 'you@tuta.com' : '');
     if (!lastEmail && isTauri) {
       try {
@@ -1015,6 +1017,66 @@ export class MailApp {
       // Offline or session expired; the next event or poll retries.
     } finally {
       this.inboxCheckInFlight = false;
+    }
+  }
+
+  updateAvailable = $state<import('./updates').UpdateInfo | null>(null);
+  checkingUpdate = $state(false);
+  installingUpdate = $state(false);
+  updateProgress = $state<number | null>(null);
+  updateError = $state<string | null>(null);
+
+  async checkForUpdates(manual = true): Promise<void> {
+    const mode = this.info?.update_mode;
+    if (!isTauri || mode === 'none' || mode === 'package_manager') {
+      if (manual) {
+        this.toast(
+          mode === 'package_manager'
+            ? 'Updates are handled by your package manager.'
+            : 'In-app updates are not available in this build.',
+          'info'
+        );
+      }
+      return;
+    }
+    if (this.checkingUpdate) return;
+    this.checkingUpdate = true;
+    this.updateError = null;
+    try {
+      const { checkForUpdate } = await import('./updates');
+      this.updateAvailable = await checkForUpdate();
+      if (manual) {
+        this.toast(
+          this.updateAvailable
+            ? `Update ${this.updateAvailable.version} is available.`
+            : 'TMail is up to date.',
+          this.updateAvailable ? 'info' : 'success'
+        );
+      } else if (this.updateAvailable) {
+        this.toast(`Update ${this.updateAvailable.version} is available`, 'info', {
+          label: 'Install',
+          run: () => void this.installUpdate()
+        });
+      }
+    } catch (error) {
+      if (manual) this.updateError = this.message(error);
+    } finally {
+      this.checkingUpdate = false;
+    }
+  }
+
+  async installUpdate(): Promise<void> {
+    if (this.installingUpdate) return;
+    this.installingUpdate = true;
+    this.updateError = null;
+    this.updateProgress = 0;
+    try {
+      const { installPendingUpdate } = await import('./updates');
+      await installPendingUpdate((progress) => (this.updateProgress = progress));
+    } catch (error) {
+      this.updateError = this.message(error);
+      this.installingUpdate = false;
+      this.updateProgress = null;
     }
   }
 

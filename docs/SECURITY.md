@@ -41,3 +41,6 @@ cargo deny check        # if installed
   `core/src/net.rs`; a dependency that phones home would fail that test only if
   it uses our injected client, so review new dependencies for their own
   networking.
+- In-app updates contact GitHub Releases only and verify the Tauri minisign
+  signature against the public key in `tauri.conf.json`. `.deb`/`.rpm`/Arch
+  installs disable in-app updates and use the package manager.

@@ -47,7 +47,9 @@ the word only descriptively and ships no Tuta artwork. Icons are original.
 
 ## Privacy
 
-TMail has no telemetry, analytics, crash reporting or update pings. The only
-network destination is the configured Tuta API host, enforced by an allowlist
-in the HTTP client. Local data is encrypted at rest; the session token lives in
-the OS keyring.
+TMail has no telemetry, analytics or crash reporting. The only mail-data
+destination is the configured Tuta API host, enforced by an allowlist in the
+HTTP client. The optional in-app updater additionally contacts the project's
+GitHub Releases endpoint and verifies the Tauri signature; it is disabled for
+package-managed Linux installs. Local data is encrypted at rest; the session
+token lives in the OS keyring.
