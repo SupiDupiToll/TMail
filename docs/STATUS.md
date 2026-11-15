@@ -54,6 +54,10 @@ Done:
   contrast computed numerically, 800/1280/1440/1920, 1.5 dpr, 200% text,
   sandbox/CSP, keyboard traversal, archive undo).
 - Impeccable detector: 0 findings over `ui/src`.
+- Dev resilience: component CSS is compiled into the component modules
+  (`css: injected`), Vite pre-transforms components at startup and disables
+  dev caching. Do not run `pnpm -C ui build`/`check` while `tauri dev` is up;
+  that rewrites `.svelte-kit` and was the cause of the broken dev CSS.
 
 Screenshots (`docs/review-shots/`): login light/dark, inbox light/dark, reader
 light/dark, composer, palette, settings, mobile inbox/reader (14 images). **The owner should
