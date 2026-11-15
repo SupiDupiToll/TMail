@@ -50,6 +50,11 @@ protected external mail.
 - **Recovery:** implement only with a live test account; never fake the E2E
   state or silently downgrade.
 
+### [P2] Sender logos are deliberately absent
+- **Impact:** avatars are deterministic initials, not company logos.
+- **Reason:** fetching third-party logos would make requests outside Tuta and
+  create a phishing signal. Tuta contact photos are the safe source later.
+
 ### [P2] Server-side settings are still in Tuta web
 - **Impact:** rules, vacation replies and templates are not editable in TMail.
   Local sending, notification, appearance and privacy settings are present.
@@ -85,7 +90,8 @@ protected external mail.
 ## Strengths
 
 - The avatar rows are recognisable without timestamps, and sender weight does
-  the scanning work; columns resize and the rail collapses to icons.
+  the scanning work; columns resize and the rail collapses to a clear,
+  re-expandable icon strip.
 - Safe mail CSS and legacy markup are preserved, so real mail looks like mail
   rather than a flattened text export; the mail canvas stays light for contrast.
 - Remote content is blocked with a concrete, per-sender decision; the mail frame

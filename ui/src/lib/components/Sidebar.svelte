@@ -40,6 +40,14 @@
     <button class="icon-btn settings-btn" aria-label="Settings" title="Settings" onclick={() => (app.settingsOpen = true)}>
       <Icon name="settings" size={17} />
     </button>
+    <button
+      class="icon-btn collapse-btn"
+      aria-label={app.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      title={app.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      onclick={() => app.toggleSidebar()}
+    >
+      <Icon name={app.sidebarCollapsed ? 'chevron' : 'chevron-left'} size={16} />
+    </button>
   </div>
 
   <div class="compose-wrap">
@@ -99,15 +107,6 @@
     <button class="foot-action shortcuts" onclick={() => (app.helpOpen = true)} title="Keyboard shortcuts">
       <span class="kbd">?</span>
       <span class="foot-label">Shortcuts</span>
-    </button>
-    <button
-      class="foot-action collapse"
-      aria-label={app.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      title={app.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      onclick={() => app.toggleSidebar()}
-    >
-      <Icon name={app.sidebarCollapsed ? 'chevron' : 'chevron-left'} size={15} />
-      <span class="foot-label">{app.sidebarCollapsed ? 'Expand' : 'Collapse'}</span>
     </button>
   </div>
 </aside>
@@ -277,7 +276,9 @@
   :global([data-sidebar='collapsed']) .account {
     justify-content: center;
     padding: 12px 0 10px;
+    gap: 0;
   }
+  :global([data-sidebar='collapsed']) .account :global(.avatar),
   :global([data-sidebar='collapsed']) .account-text,
   :global([data-sidebar='collapsed']) .settings-btn,
   :global([data-sidebar='collapsed']) .compose-label,
@@ -303,17 +304,13 @@
   :global([data-sidebar='collapsed']) .folder .badge {
     display: none;
   }
+  :global([data-sidebar='collapsed']) .collapse-btn {
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
   :global([data-sidebar='collapsed']) .sidebar-foot {
-    justify-content: center;
-    flex-direction: column;
-    gap: 4px;
-  }
-  :global([data-sidebar='collapsed']) .shortcuts {
     display: none;
-  }
-  :global([data-sidebar='collapsed']) .collapse {
-    width: 40px;
-    justify-content: center;
-    padding: 6px 0;
   }
 </style>

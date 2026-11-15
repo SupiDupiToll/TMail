@@ -150,7 +150,7 @@ pub async fn send(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<(String
                         .object
                         .encrypt_key(bucket_key, InitializationVector::generate(&randomizer));
                     sym_keys.push(SymEncInternalRecipientKeyData {
-                        _id: None,
+                        _id: Some(random_custom_id(&randomizer)),
                         mailAddress: address.trim().to_ascii_lowercase(),
                         symEncBucketKey: sym_enc,
                         symKeyVersion: i64::try_from(recipient_key.version).unwrap_or(i64::MAX),
@@ -167,7 +167,7 @@ pub async fn send(sdk: &Arc<LoggedInSdk>, outgoing: &Outgoing) -> Result<(String
                     })?;
                 all_tuta_crypt &= key.protocol_version() == 2;
                 keys.push(InternalRecipientKeyData {
-                    _id: None,
+                    _id: Some(random_custom_id(&randomizer)),
                     mailAddress: address.trim().to_ascii_lowercase(),
                     pubEncBucketKey: key.bytes().to_vec(),
                     recipientKeyVersion: key.recipient_key_version(),
@@ -290,7 +290,7 @@ async fn create_draft(
     .await?;
 
     let data = DraftData {
-        _id: None,
+        _id: Some(random_custom_id(randomizer)),
         subject: outgoing.subject.clone(),
         bodyText: String::new(),
         senderMailAddress: outgoing.sender_address.clone(),
@@ -302,9 +302,9 @@ async fn create_draft(
         confidential,
         method: 0,
         compressedBodyText: Some(outgoing.body_html.clone()),
-        toRecipients: recipients(&outgoing.to),
-        ccRecipients: recipients(&outgoing.cc),
-        bccRecipients: recipients(&outgoing.bcc),
+        toRecipients: recipients(&outgoing.to, randomizer),
+        ccRecipients: recipients(&outgoing.cc, randomizer),
+        bccRecipients: recipients(&outgoing.bcc, randomizer),
         addedAttachments: added_attachments,
         removedAttachments: Vec::new(),
         // Tuta drops Reply-To on outgoing mail; see the reference analysis.
@@ -338,13 +338,13 @@ async fn create_draft(
     })
 }
 
-fn recipients(addresses: &[String]) -> Vec<DraftRecipient> {
+fn recipients(addresses: &[String], randomizer: &RandomizerFacade) -> Vec<DraftRecipient> {
     addresses
         .iter()
         .map(|address| {
             let address = address.trim();
             DraftRecipient {
-                _id: None,
+                _id: Some(random_custom_id(randomizer)),
                 name: address.to_string(),
                 mailAddress: address.to_string(),
                 _errors: Default::default(),

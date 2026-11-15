@@ -42,10 +42,11 @@ Done:
 - Tauri 2 shell: window, tray with close-to-tray fallback, single instance,
   notifications, native save dialog, `mailto:` cold start, window state.
 - Svelte 5 UI: three-pane quiet-workspace layout, virtualised avatar list with
-  no timestamps, collapsible/resizable columns, reader with sandboxed HTML and
-  a light mail canvas, per-sender remote-content choice, attachment previews,
-  command palette, expanded local settings, keyboard shortcuts,
-  light/dark/system, density.
+  no timestamps, collapsible icon rail with a visible expand control and
+  resizable columns, reader with sandboxed HTML and a light mail canvas,
+  per-sender remote-content choice, attachment previews, command palette,
+  Gmail-style composer that expands to a large centred window, expanded local
+  settings, keyboard shortcuts, light/dark/system, density.
 - Text-based verification: 28 Playwright tests + 13 Vitest tests pass (axe serious/critical = 0,
   contrast computed numerically, 800/1280/1440/1920, 1.5 dpr, 200% text,
   sandbox/CSP, keyboard traversal, archive undo).
@@ -78,9 +79,11 @@ Missing: label management, inbox rules UI, spam classification UI.
 
 1. Obtain the dedicated test account (`docs/QUESTIONS.md`) and run
    `docs/SMOKE.md` (sender aliases, auto E2E, scheduled send, mail formatting,
-   attachment preview). Re-test the send path: the draft body shape, own-address
-   symmetric keys and confidential attachment keys were corrected, and errors
-   now carry the SDK detail so any remaining failure is actionable.
+   attachment preview). The send path now also assigns required `_id`s to the
+   aggregate send records (`DraftData`, `DraftRecipient`,
+   `SymEncInternalRecipientKeyData`), which was the cause of the reported
+   `InstanceMapperError ... TypeId(1347) _id`. Re-test and report any new SDK
+   detail.
 2. Add a `tauri-driver` smoke job for tray/notifications/mailto.
 3. Implement external confidential mail once the SDK exposes the external
    group/Bcrypt flow (or port it carefully with live tests).

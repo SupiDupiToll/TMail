@@ -109,7 +109,7 @@ const paragraphs = [
   'A new device signed in to your account from Arch Linux. If this was you, no action is needed.'
 ];
 
-const richBody = `<div style="font-family:'Atkinson Hyperlegible Next',sans-serif;max-width:560px;color:#1a211d;background:#ffffff;padding:18px 20px;border-radius:10px">
+const richBody = `<div style="font-family:'Atkinson Hyperlegible Next',sans-serif;max-width:100%;color:#1a211d;background:#ffffff;padding:18px 20px;border-radius:10px">
 <h2 style="margin:0 0 10px;font-size:20px;color:#1d6b5f">Your flight itinerary</h2>
 <p style="margin:0 0 14px;color:#56625b;font-size:13px">Booking reference <strong>TM-7QK2</strong> · Gate closes 25 minutes before departure.</p>
 <table style="width:100%;border-collapse:collapse;font-size:13px">

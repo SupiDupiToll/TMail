@@ -202,7 +202,7 @@
     align-items: center;
     justify-content: center;
     gap: 18px;
-    min-height: 100%;
+    min-height: 100vh;
     padding: 28px;
     background: var(--bg);
   }

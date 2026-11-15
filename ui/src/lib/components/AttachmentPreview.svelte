@@ -78,7 +78,7 @@
     max-height: none;
     margin: auto;
     padding: 0;
-    border: 1px solid var(--border-strong);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--panel);
     color: var(--text);

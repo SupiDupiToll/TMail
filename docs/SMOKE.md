@@ -27,9 +27,10 @@ for now, run the desktop app with `TMAIL_API_URL=https://app.tuta.com`.
    attachment decrypts, and the Sent copy appears. Repeat as a normal external
    send and as a Tuta-recipient E2E send. Schedule one for +5 minutes and verify
    it leaves at the scheduled time.
-8. **Layout**: collapse the sidebar to icons, resize both columns by dragging
-   and with arrow keys, expand the composer, then reset the layout. Reload and
-   confirm the choices persisted.
+8. **Layout**: collapse the sidebar to icons and re-expand it with the visible
+   chevron, resize both columns by dragging and with arrow keys, expand the
+   composer to its large centred window (not fullscreen), then reset the
+   layout. Reload and confirm the choices persisted.
 9. **Encryption state**: send to a Tuta address; verify the composer shows
    "Encrypted" and the mail is readable only in Tuta. Send to an external
    address; verify the composer explicitly says "Not encrypted". Password-

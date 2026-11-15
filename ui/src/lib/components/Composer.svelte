@@ -320,27 +320,23 @@
 
 <style>
   .composer-dialog {
-    width: min(820px, calc(100vw - 48px));
+    width: min(640px, calc(100vw - 48px));
     max-width: none;
-    height: min(720px, calc(100vh - 64px));
+    height: min(620px, calc(100vh - 64px));
     max-height: none;
-    margin: auto 24px 24px auto;
+    margin: auto 20px 20px auto;
     padding: 0;
-    border: 1px solid var(--border-strong);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--panel);
     color: var(--text);
     box-shadow: var(--shadow);
     overflow: hidden;
-    resize: both;
-    min-width: 520px;
-    min-height: 420px;
   }
   .composer-dialog.maximized {
-    resize: none;
-    width: calc(100vw - 24px);
-    height: calc(100vh - 24px);
-    margin: 12px;
+    width: min(1080px, calc(100vw - 64px));
+    height: min(820px, calc(100vh - 80px));
+    margin: auto;
   }
   .composer-dialog::backdrop {
     background: var(--scrim);

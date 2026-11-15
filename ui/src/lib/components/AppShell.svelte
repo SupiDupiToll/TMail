@@ -196,8 +196,6 @@
 
 <svelte:window onkeydown={onWindowKeydown} />
 
-<a class="skip-link" href="#message-list">Skip to message list</a>
-
 <div
   class="shell"
   bind:this={shell}
@@ -260,23 +258,6 @@
 <Toasts />
 
 <style>
-  .skip-link {
-    position: fixed;
-    top: 8px;
-    left: 8px;
-    z-index: 100;
-    padding: 8px 12px;
-    border-radius: var(--radius-sm);
-    background: var(--accent);
-    color: var(--accent-contrast);
-    font-size: var(--text-sm);
-    font-weight: 700;
-    transform: translateY(-200%);
-    transition: transform var(--dur-fast) ease-out;
-  }
-  .skip-link:focus-visible {
-    transform: translateY(0);
-  }
   .shell {
     position: relative;
     display: grid;
