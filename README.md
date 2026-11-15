@@ -24,15 +24,33 @@ reader that never loads a tracking pixel by itself.
 
 > Synthetic demo mailbox. No real account content is shown.
 
-| Inbox | Reader |
-|---|---|
-| ![TMail inbox with sender avatars and no timestamps](docs/review-shots/inbox-light.png) | ![TMail reader with a formatted message](docs/review-shots/reader-light.png) |
-| **Composer** | **Command palette** |
-| ![Gmail-style TMail composer with aliases and scheduling](docs/review-shots/composer-light.png) | ![TMail command palette and local search](docs/review-shots/palette-light.png) |
-| **Settings** | **Dark theme** |
-| ![TMail settings for appearance, sending and notifications](docs/review-shots/settings-light.png) | ![TMail inbox in dark mode](docs/review-shots/inbox-dark.png) |
-| **Mobile inbox** | **Mobile reader** |
-| ![TMail responsive inbox](docs/review-shots/mobile-inbox.png) | ![TMail responsive reader](docs/review-shots/mobile-reader.png) |
+### Inbox — overview
+
+![TMail inbox with sender avatars, unread dots and no timestamps](docs/review-shots/inbox-light.png)
+
+### Reader
+
+![TMail reader with a formatted message, attachments and inline links](docs/review-shots/reader-light.png)
+
+### Composer
+
+![Gmail-style TMail composer with sender aliases, schedule and attachments](docs/review-shots/composer-light.png)
+
+### Command palette
+
+![TMail command palette with actions and local search](docs/review-shots/palette-light.png)
+
+### Settings
+
+![TMail settings for appearance, sending, notifications and privacy](docs/review-shots/settings-light.png)
+
+### Dark theme
+
+![TMail inbox in dark mode](docs/review-shots/inbox-dark.png)
+
+### Mobile inbox
+
+![TMail responsive inbox](docs/review-shots/mobile-inbox.png)
 
 ---
 

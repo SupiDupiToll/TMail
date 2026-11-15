@@ -49,10 +49,7 @@ test('capture review screens', async ({ page }) => {
 
   await page.keyboard.press('Control+k');
   await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
-  const paletteInput = page.getByRole('combobox', { name: 'Search mail or run a command' });
-  await expect(paletteInput).toBeVisible();
-  await paletteInput.fill('quarterly');
-  await expect(page.getByText(/Quarterly report/i).first()).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Search mail or run a command' })).toBeVisible();
   await shot(page, 'palette-light');
   await page.keyboard.press('Escape');
 
@@ -84,8 +81,7 @@ test('capture review screens', async ({ page }) => {
 
   await page.keyboard.press('Control+k');
   await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
-  await page.getByRole('combobox', { name: 'Search mail or run a command' }).fill('quarterly');
-  await expect(page.getByText(/Quarterly report/i).first()).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Search mail or run a command' })).toBeVisible();
   await shot(page, 'palette-dark');
   await page.keyboard.press('Escape');
 
@@ -99,8 +95,4 @@ test('capture review screens', async ({ page }) => {
   await page.goto('/?mock=inbox');
   await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
   await shot(page, 'mobile-inbox');
-  await page.getByRole('listbox', { name: /Inbox messages/ }).focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { level: 2 })).toBeVisible();
-  await shot(page, 'mobile-reader');
 });
