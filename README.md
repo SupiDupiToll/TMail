@@ -168,6 +168,19 @@ engine.
 Builds are not code-signed. On Windows, choose “More info → Run anyway” only if
 you trust the build; on macOS, right-click → Open the first time.
 
+### Updates
+
+- **AppImage, Windows and macOS:** TMail checks GitHub Releases for a signed
+  update and can install it from Settings or the update toast. The update is
+  verified against the bundled Tauri public key.
+- **`.deb`, `.rpm` and distribution packages:** use your package manager. TMail
+  deliberately does not replace package-managed files behind its back.
+- The updater contacts only the project’s GitHub Releases endpoint. No telemetry
+  is sent.
+
+v0.2.0 did not ship the updater yet; install **v0.2.1 or newer** once manually.
+After that, in-app updates work for AppImage/Windows/macOS.
+
 ### First start
 
 1. Enter your Tuta address and password. TOTP is supported; U2F/WebAuthn is
