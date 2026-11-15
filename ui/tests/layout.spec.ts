@@ -132,13 +132,13 @@ test('mail HTML is sandboxed, scripts stripped and remote pixels blocked', async
   const iframe = page.locator('iframe');
   await expect(iframe).toHaveCount(1);
   const sandbox = await iframe.getAttribute('sandbox');
-  expect(sandbox).toContain('allow-same-origin');
-  expect(sandbox).not.toContain('allow-scripts');
+  expect(sandbox).toContain('allow-scripts');
+  expect(sandbox).not.toContain('allow-same-origin');
   expect(await iframe.getAttribute('referrerpolicy')).toBe('no-referrer');
 
   const srcdoc = (await iframe.getAttribute('srcdoc')) ?? '';
   expect(srcdoc).toContain("default-src 'none'");
-  expect(srcdoc).toContain("script-src 'none'");
+  expect(srcdoc).toContain("script-src 'sha256-");
   expect(srcdoc).toContain('img-src data:');
   expect(srcdoc).not.toContain('tracker.example');
   expect(srcdoc).not.toContain('window.__pwned');
@@ -238,14 +238,7 @@ test('links are intercepted by the trusted parent, not navigated in-frame', asyn
     .toBe('https://example.com/verify');
   expect(page.url()).toContain('/?mock=inbox');
 
-  await page.evaluate(() => ((window as unknown as { __opened: string | null }).__opened = null));
-  await page
-    .locator('.link-strip')
-    .getByRole('button', { name: 'Manage this booking' })
-    .click();
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { __opened: string | null }).__opened))
-    .toBe('https://example.com/verify');
+
 });
 
 test('attachments preview in-app and close on the backdrop', async ({ page }) => {

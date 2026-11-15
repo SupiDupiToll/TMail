@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify';
 import * as csstree from 'css-tree';
+import { BOOTSTRAP_HASH, BOOTSTRAP_SCRIPT } from './bootstrap';
 
 /**
  * Mail HTML sanitisation and the sandboxed document wrapper.
@@ -128,7 +129,9 @@ export function sanitizeMailHtml(html: string, options: SanitizeOptions): Saniti
     anchor.setAttribute('data-href', href);
     anchor.setAttribute('role', 'link');
     anchor.setAttribute('tabindex', '0');
-    anchor.removeAttribute('href');
+    // Keep a harmless href so WebKit treats it as a real link; the injected
+    // bootstrap prevents the fragment navigation and forwards the URL.
+    anchor.setAttribute('href', '#');
     anchor.removeAttribute('target');
     const label = (anchor.textContent ?? '').trim() || href;
     if (!links.has(href)) links.set(href, label.slice(0, 120));
@@ -272,7 +275,7 @@ function wrap(
     "default-src 'none'",
     `img-src ${imgSrc}`,
     "style-src 'unsafe-inline'",
-    "script-src 'none'",
+    `script-src '${BOOTSTRAP_HASH}'`,
     "font-src data:",
     "connect-src 'none'",
     "media-src 'none'",
@@ -328,15 +331,15 @@ function wrap(
 ${emailCss ? `<style>${emailCss}</style>` : ''}
 </head>
 <body>${body}
+<script>${BOOTSTRAP_SCRIPT}</script>
 </body>
 </html>`;
 
   return {
     srcdoc,
-    // No allow-scripts: the document is inert. allow-same-origin lets the
-    // trusted parent measure the body and intercept links; the document has
-    // no script engine of its own and its CSP forbids scripts entirely.
-    sandbox: 'allow-same-origin',
+    // The only script is the nonce-less, hash-pinned bootstrap above. The
+    // frame has an opaque origin, so it cannot reach the app DOM or IPC.
+    sandbox: 'allow-scripts',
     links
   };
 }

@@ -39,7 +39,6 @@
     hoveredLink = null;
   });
 
-  let frameCleanup: (() => void) | null = null;
   let moreMenu = $state<HTMLDetailsElement | null>(null);
 
   $effect(() => {
@@ -53,11 +52,6 @@
     return () => document.removeEventListener('click', onDocumentClick);
   });
 
-  function cleanupFrame(): void {
-    frameCleanup?.();
-    frameCleanup = null;
-  }
-
   function handleLink(href: string): void {
     if (/^mailto:/i.test(href)) {
       const request = parseMailto(href);
@@ -69,86 +63,35 @@
     }
   }
 
-  function attachFrame(attempt = 0): void {
+
+  $effect(() => {
+    // Height, link clicks, hover preview and shortcuts all arrive through
+    // postMessage from the opaque-origin mail frame. This works in WebKit even
+    // when direct contentDocument access is denied.
     if (!iframe) return;
-    cleanupFrame();
-    const doc = iframe.contentDocument;
-    if (!doc?.body) {
-      if (attempt < 10) setTimeout(() => attachFrame(attempt + 1), 40);
-      return;
-    }
-
-    const measure = () => {
-      const height = Math.max(
-        doc.body.scrollHeight,
-        doc.documentElement.scrollHeight
-      );
-      const next = Math.min(20000, Math.max(120, height));
-      if (Math.abs(next - bodyHeight) > 1) bodyHeight = next;
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(doc.body);
-    window.addEventListener('resize', measure);
-
-    const onClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      const anchor = target?.closest<HTMLElement>('a[data-href]');
-      if (!anchor) return;
-      event.preventDefault();
-      handleLink(anchor.getAttribute('data-href') ?? '');
-    };
-    const onOver = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      const anchor = target?.closest<HTMLElement>('a[data-href]');
-      hoveredLink = anchor?.getAttribute('data-href') ?? null;
-    };
-    const onLeave = () => {
-      hoveredLink = null;
-    };
-    const onKey = (event: KeyboardEvent) => {
-      const key = event.key;
-      const target = event.target as HTMLElement | null;
-      const anchor = target?.closest<HTMLElement>('a[data-href]');
-      if (anchor && (key === 'Enter' || key === ' ')) {
-        event.preventDefault();
-        handleLink(anchor.getAttribute('data-href') ?? '');
-        return;
+    const handler = (event: MessageEvent) => {
+      if (event.source !== iframe?.contentWindow) return;
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type === 'tmail-height' && typeof data.height === 'number') {
+        bodyHeight = Math.min(20000, Math.max(120, data.height));
+      } else if (data.type === 'tmail-hover' && typeof data.href === 'string') {
+        hoveredLink = data.href || null;
+      } else if (data.type === 'tmail-link' && typeof data.href === 'string') {
+        handleLink(data.href);
+      } else if (data.type === 'tmail-key' && typeof data.key === 'string') {
+        onShortcut?.(data.key, Boolean(data.ctrl), Boolean(data.shift));
       }
-      const action =
-        ['j', 'k', 'u', 'e', '#', 'r', 'a', 'f', 'c', 'x', 'g', 'R', 'Delete', 'Escape', '/', '?'].includes(key) ||
-        (event.ctrlKey && key.toLowerCase() === 'k');
-      if (!action) return;
-      onShortcut?.(key, event.ctrlKey, event.shiftKey);
-      if (key === 'Escape') event.preventDefault();
     };
-
-    doc.addEventListener('click', onClick);
-    doc.addEventListener('mouseover', onOver);
-    doc.documentElement.addEventListener('mouseleave', onLeave);
-    doc.addEventListener('keydown', onKey);
-
-    frameCleanup = () => {
-      observer.disconnect();
-      window.removeEventListener('resize', measure);
-      doc.removeEventListener('click', onClick);
-      doc.removeEventListener('mouseover', onOver);
-      doc.documentElement.removeEventListener('mouseleave', onLeave);
-      doc.removeEventListener('keydown', onKey);
-    };
-  }
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  });
 
   $effect(() => {
     detail?.summary.id;
     allowRemote;
-    cleanupFrame();
     bodyHeight = 320;
     hoveredLink = null;
-    const timer = setTimeout(() => attachFrame(), 0);
-    return () => {
-      clearTimeout(timer);
-      cleanupFrame();
-    };
   });
 
   function mailtoLabel(): string {
@@ -296,21 +239,9 @@
           sandbox={sanitized.sandbox}
           referrerpolicy="no-referrer"
           style:height={`${bodyHeight}px`}
-          onload={() => attachFrame()}
         ></iframe>
       {/if}
     </div>
-
-    {#if sanitized?.links.length}
-      <div class="link-strip" aria-label="Links in this message">
-        <span class="link-strip-label">Links</span>
-        {#each sanitized.links.slice(0, 10) as link (link.href)}
-          <button class="link-chip" title={link.href} onclick={() => handleLink(link.href)}>
-            {link.label}
-          </button>
-        {/each}
-      </div>
-    {/if}
 
     {#if visibleAttachments.length > 0}
       <section class="attachments" aria-label="Attachments">
@@ -486,39 +417,6 @@
     background: #ffffff;
     color-scheme: light;
     overflow: hidden;
-  }
-  .link-strip {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    flex-wrap: wrap;
-    flex: none;
-    padding: 8px 28px;
-    border-top: 1px solid var(--border);
-    background: var(--panel);
-  }
-  .link-strip-label {
-    font-size: 10px;
-    font-weight: 750;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--faint);
-    margin-right: 2px;
-  }
-  .link-chip {
-    max-width: 240px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: 3px 8px;
-    border-radius: var(--radius-pill);
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-size: var(--text-xs);
-    font-weight: 600;
-  }
-  .link-chip:hover {
-    background: color-mix(in srgb, var(--accent) 18%, var(--panel));
   }
   .attachments {
     flex: none;

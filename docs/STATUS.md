@@ -50,7 +50,7 @@ Done:
   per-sender remote-content choice, attachment previews, command palette,
   Gmail-style composer that expands to a large centred window, expanded local
   settings, keyboard shortcuts, light/dark/system, density.
-- Text-based verification: 28 Playwright tests + 14 Vitest tests pass (axe serious/critical = 0,
+- Text-based verification: 28 Playwright tests + 15 Vitest tests pass (axe serious/critical = 0,
   contrast computed numerically, 800/1280/1440/1920, 1.5 dpr, 200% text,
   sandbox/CSP, keyboard traversal, archive undo).
 - Impeccable detector: 0 findings over `ui/src`.

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sanitizeMailHtml } from './sanitize';
+import { BOOTSTRAP_HASH, BOOTSTRAP_SCRIPT } from './bootstrap';
+import { createHash } from 'node:crypto';
 
 const options = { allowRemote: false, sender: 'ada@example.com' };
 
@@ -55,9 +57,9 @@ describe('sanitizeMailHtml', () => {
     );
     expect(srcdoc).not.toContain('tracker.example');
     expect(srcdoc).toContain('[remote image blocked');
-    expect(srcdoc).toContain("script-src 'none'");
+    expect(srcdoc).toContain("script-src 'sha256-");
     expect(srcdoc).toContain("default-src 'none'");
-    expect(sandbox).toBe('allow-same-origin');
+    expect(sandbox).toBe('allow-scripts');
   });
 
   it('allows remote images only after the per-sender opt-in', () => {
@@ -67,7 +69,8 @@ describe('sanitizeMailHtml', () => {
     );
     expect(srcdoc).toContain('https://images.example/logo.png');
     expect(srcdoc).toContain('img-src data: https:');
-    expect(sandbox).not.toContain('allow-scripts');
+    expect(sandbox).toContain('allow-scripts');
+    expect(sandbox).not.toContain('allow-same-origin');
   });
 
   it('rewrites links so the frame cannot navigate', () => {
@@ -87,6 +90,11 @@ describe('sanitizeMailHtml', () => {
       options
     );
     expect(links).toEqual([{ href: 'https://example.com/x', label: 'Example' }]);
+  });
+
+  it('pins the bootstrap script to its CSP hash', () => {
+    const digest = createHash('sha256').update(BOOTSTRAP_SCRIPT).digest('base64');
+    expect(BOOTSTRAP_HASH).toBe(`sha256-${digest}`);
   });
 
   it('keeps data: images and table markup', () => {

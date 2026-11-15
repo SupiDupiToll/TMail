@@ -99,8 +99,8 @@ protected external mail.
   positioning.
 - New-mail detection has an event-bus fast path and an Inbox poll as a safety
   net; notifications respect focus/hidden state, appear once, carry the TMail
-  icon and an "Open email" action. Mail links are also available in a reliable
-  parent-rendered link strip.
+  icon and an "Open email" action. Mail links are forwarded from the frame
+  bootstrap, so they work inline even when WebKit denies direct document access.
 - Keyboard flow (`j/k`, `Enter`, `u/e/#`, `r/a/f`, `Ctrl+K`, `g` sequences) is
   coherent and discoverable through the palette and help sheet.
 - The encrypted-cache/session/keyring story is visible in settings and errors,
@@ -111,7 +111,7 @@ protected external mail.
 - `pnpm -C ui check`: 0 errors, 0 warnings.
 - `pnpm -C ui exec playwright test`: 28 passed, 1 skipped (screenshots).
 - `impeccable detect --json ui/src`: 0 findings.
-- `pnpm -C ui test`: 14 passed (sanitiser and formatting).
+- `pnpm -C ui test`: 15 passed (sanitiser, hash pin and formatting).
 - `cargo test -p tmail-core`: 58 passed.
 - `cargo test -p tmail-desktop`: 3 passed (mailto parser).
 - Screenshots in `docs/review-shots/` (14: light/dark inbox, reader, composer,

@@ -28,9 +28,9 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src ipc: http://ipc.localhost; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'none'",
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'sha256-8gwRP+guhJ0UPsPbea5fO151gN5wxuJoTFhkNwsnomE='; connect-src ipc: http://ipc.localhost; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'none'",
       "dangerousDisableAssetCspModification": false,
-      "devCsp": "default-src 'self' http://127.0.0.1:5173; img-src 'self' data: http://127.0.0.1:5173; style-src 'self' 'unsafe-inline' http://127.0.0.1:5173; font-src 'self' data: http://127.0.0.1:5173; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:5173; connect-src ipc: http://ipc.localhost http://127.0.0.1:5173 ws://127.0.0.1:5173; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'none'"
+      "devCsp": "default-src 'self' http://127.0.0.1:5173; img-src 'self' data: http://127.0.0.1:5173; style-src 'self' 'unsafe-inline' http://127.0.0.1:5173; font-src 'self' data: http://127.0.0.1:5173; script-src 'self' 'sha256-8gwRP+guhJ0UPsPbea5fO151gN5wxuJoTFhkNwsnomE=' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:5173; connect-src ipc: http://ipc.localhost http://127.0.0.1:5173 ws://127.0.0.1:5173; frame-src 'self' data: blob: about:; object-src 'none'; base-uri 'self'; form-action 'none'"
     }
   },
   "bundle": {
