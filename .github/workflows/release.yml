@@ -82,6 +82,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           includeUpdaterJson: true
+          updaterJsonPreferNsis: true
           releaseName: "TMail ${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
