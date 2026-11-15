@@ -199,6 +199,7 @@ impl CoreService {
             .map(|id| id.0)
             .unwrap_or_else(|| stored.user_id.clone());
         let (display_name, sender_addresses) = load_account_identity(&sdk, &stored.email).await;
+        self.remember_account(&stored.email);
         let session_persisted =
             self.sessions.save(&stored).is_ok() && self.sessions.is_persistent();
         if !session_persisted {
@@ -246,6 +247,35 @@ impl CoreService {
         }
     }
 
+    /// The last account that successfully activated. The file contains only
+    /// the address and API URL, never a token; it lets a fresh WebView find the
+    /// keyring entry again.
+    pub fn last_account(&self) -> Option<(String, String)> {
+        let raw = std::fs::read_to_string(self.data_dir.join("last-account.json")).ok()?;
+        let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        Some((
+            value.get("email")?.as_str()?.to_string(),
+            value.get("api_url")?.as_str()?.to_string(),
+        ))
+    }
+
+    fn remember_account(&self, email: &str) {
+        let path = self.data_dir.join("last-account.json");
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let value =
+            serde_json::json!({ "email": email.to_ascii_lowercase(), "api_url": self.api_url });
+        if let Ok(json) = serde_json::to_vec_pretty(&value) {
+            let _ = std::fs::write(&path, json);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+            }
+        }
+    }
+
     pub async fn snapshot(&self) -> Result<Snapshot> {
         let active = self.active()?;
         Ok(self.build_snapshot(&active))
@@ -262,6 +292,7 @@ impl CoreService {
             let _ = self.sessions.delete(&email, &self.api_url);
         }
         *self.active.write().unwrap() = None;
+        let _ = std::fs::remove_file(self.data_dir.join("last-account.json"));
     }
 
     /// Removes the encrypted cache for the current account as well as the

@@ -46,6 +46,8 @@ function mockInvoke(command: string, args?: Record<string, unknown>): unknown {
       };
     case 'resume':
       return mock.signedIn ? mock.snapshot() : null;
+    case 'last_account':
+      return { email: 'you@tuta.com', api_url: 'https://app.tuta.com' };
     case 'login':
       return { status: 'logged_in', snapshot: mock.login() } satisfies LoginResult;
     case 'submit_totp':
@@ -153,6 +155,11 @@ export interface SaveAttachmentResult {
   path?: string;
 }
 
+export interface LastAccount {
+  email: string;
+  api_url: string;
+}
+
 export interface RecipientKind {
   address: string;
   internal: boolean;
@@ -167,6 +174,7 @@ export interface AttachmentData {
 export const api = {
   appInfo: () => invoke<AppInfo>('app_info'),
   resume: (email: string) => invoke<Snapshot | null>('resume', { email }),
+  lastAccount: () => invoke<LastAccount | null>('last_account'),
   login: (email: string, password: string) =>
     invoke<LoginResult>('login', { email, password }),
   submitTotp: (code: number) => invoke<Snapshot>('submit_totp', { code }),

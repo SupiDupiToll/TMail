@@ -222,7 +222,18 @@ export class MailApp {
     }
 
     this.startInboxWatch();
-    const lastEmail = getString('tmail.last-email') || (isMock ? 'you@tuta.com' : '');
+    let lastEmail = getString('tmail.last-email') || (isMock ? 'you@tuta.com' : '');
+    if (!lastEmail && isTauri) {
+      try {
+        const last = await api.lastAccount();
+        if (last) {
+          lastEmail = last.email;
+          setString('tmail.last-email', last.email.toLowerCase());
+        }
+      } catch {
+        /* first run or no metadata */
+      }
+    }
     if (lastEmail) {
       try {
         const snapshot = await api.resume(lastEmail);
@@ -325,6 +336,9 @@ export class MailApp {
   };
 
   applySnapshot(snapshot: Snapshot): void {
+    // Remember the account for the next start. This also covers the TOTP path,
+    // where login() returns early and previously never wrote the marker.
+    if (snapshot.email) setString('tmail.last-email', snapshot.email.toLowerCase());
     this.snapshot = snapshot;
     this.unreadTotal = snapshot.unread.reduce((sum, entry) => sum + entry.unread, 0);
     this.auth = 'signed_in';

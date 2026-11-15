@@ -134,6 +134,20 @@ pub async fn cancel_login(state: State<'_, AppState>) -> ApiResult<()> {
     Ok(())
 }
 
+#[derive(Serialize)]
+pub struct LastAccount {
+    email: String,
+    api_url: String,
+}
+
+#[tauri::command]
+pub fn last_account(state: State<'_, AppState>) -> Option<LastAccount> {
+    state
+        .service
+        .last_account()
+        .map(|(email, api_url)| LastAccount { email, api_url })
+}
+
 #[tauri::command]
 pub async fn resume(state: State<'_, AppState>, email: String) -> ApiResult<Option<Snapshot>> {
     state.service.resume(&email).await.map_err(ApiError::from)

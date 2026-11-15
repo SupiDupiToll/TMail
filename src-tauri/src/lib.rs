@@ -77,6 +77,7 @@ pub fn run() {
             commands::login,
             commands::submit_totp,
             commands::cancel_login,
+            commands::last_account,
             commands::resume,
             commands::snapshot,
             commands::logout,
