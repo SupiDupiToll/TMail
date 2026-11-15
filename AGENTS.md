@@ -47,6 +47,9 @@ pnpm -C ui build
 pnpm tauri dev
 pnpm tauri build
 # Note: Tauri's config lives in src-tauri/; run the CLI from the root.
+# Do not run `pnpm -C ui build` or `pnpm -C ui check` while `pnpm tauri dev`
+# is running: both rewrite .svelte-kit and can corrupt the dev server's
+# virtual CSS/HMR state. Stop the dev server first, then restart it.
 
 # UI verification without images (Playwright, text output only)
 pnpm -C ui exec playwright test --reporter=line
