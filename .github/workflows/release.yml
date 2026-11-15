@@ -164,7 +164,7 @@ jobs:
           walk(root);
           const sums = files
             .sort()
-            .map((file) => `${crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')}  ${path.relative(root, file)}`)
+            .map((file) => `${crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')}  ${path.basename(file)}`)
             .join('\n');
           fs.writeFileSync(`SHA256SUMS-${process.env.RUNNER_OS}.txt`, `${sums}\n`);
           NODE
