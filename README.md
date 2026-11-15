@@ -273,8 +273,8 @@ The release workflow lives in
 [`.github/workflows/release.yml`](.github/workflows/release.yml). Push a tag:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 GitHub Actions builds on Ubuntu 24.04, Windows and macOS (universal), creates a

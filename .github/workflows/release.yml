@@ -118,6 +118,8 @@ jobs:
 
             ![Dark inbox](${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/docs/review-shots/inbox-dark.png)
 
+            [Download all screenshots (ZIP)](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/tmail-screenshots.zip)
+
             Packages:
             - Linux: `.deb`, `.rpm`, `.AppImage` (x86_64)
             - Windows: `.exe` (NSIS installer), `.msi`
@@ -168,3 +170,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${{ github.ref_name }}" "SHA256SUMS-${{ runner.os }}.txt" --clobber
+
+      - name: Upload screenshots
+        if: matrix.platform == 'ubuntu-22.04'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" docs/review-shots/*.png --clobber
+          (cd docs/review-shots && zip -qr "$RUNNER_TEMP/tmail-screenshots.zip" *.png)
+          gh release upload "${{ github.ref_name }}" "$RUNNER_TEMP/tmail-screenshots.zip" --clobber
