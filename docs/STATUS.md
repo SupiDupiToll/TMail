@@ -180,3 +180,8 @@ chain.
   viewing screenshots.
 - v0.2.3 supersedes v0.2.1 (blank) and v0.2.2 (unstyled components); both
   receive a visible warning.
+- Published `v0.2.3` on 2026-11-16. Linux, Windows and macOS checksums were
+  verified against the downloaded assets; `latest.json` reports `0.2.3` and all
+  platform URLs return 200. The released AppImage was started on the real
+  Hyprland/Wayland session and shows the centered, styled login card with the
+  theme switch in the top-right corner. v0.2.1 and v0.2.2 carry warnings.
