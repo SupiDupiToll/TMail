@@ -15,6 +15,9 @@ depends=(
   'desktop-file-utils'
 )
 makedepends=('rust' 'nodejs' 'pnpm' 'git' 'libappindicator-gtk3')
+# Arch's global LTO flags break the bundled SQLCipher/ring/PQClean static
+# libraries when Rust links them with lld; keep this package non-LTO.
+options=('!lto')
 # Fixed tag, so the package always builds the released source tree.
 source=("$pkgname::git+https://github.com/SupiDupiToll/TMail.git#tag=v$pkgver")
 sha256sums=('SKIP')
@@ -28,7 +31,7 @@ prepare() {
 build() {
   cd "$pkgname"
   pnpm -C ui build
-  cargo build --release --locked -p tmail-desktop
+  cargo build --release --locked -p tmail-desktop --features tauri/custom-protocol
 }
 
 package() {

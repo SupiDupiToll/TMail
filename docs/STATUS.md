@@ -151,7 +151,10 @@ chain.
 - `packaging/PKGBUILD` now uses the fixed source tag
   (`git+https://github.com/SupiDupiToll/TMail.git#tag=v$pkgver`) instead of a
   missing local tarball, and builds from the correct `tmail` directory. `url`
-  points at the repository.
+  points at the repository. It disables Arch's global LTO (which broke the
+  bundled SQLCipher/ring/PQClean static libraries under lld) and enables
+  `tauri/custom-protocol` so the packaged binary embeds the frontend instead of
+  navigating to the dev server.
 - Tests after the fix: 58 core, 32 Playwright (1 skipped), 15 Vitest, 0
   Svelte/A11y findings; release build succeeds with `--locked`.
 - v0.2.1 remains published with a warning; v0.2.2 is the first working

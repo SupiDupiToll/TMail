@@ -139,8 +139,10 @@ cd packaging
 makepkg -si
 ```
 
-The `PKGBUILD` expects the source tarball matching the requested version in the
-current directory (or update `source=` to the release archive). A native AUR
+The `PKGBUILD` builds the tagged source
+(`git+https://github.com/SupiDupiToll/TMail.git#tag=v$pkgver`); no local tarball
+is needed. It disables Arch's global LTO for the bundled SQLCipher/ring/PQClean
+static libraries and enables Tauri's `custom-protocol` feature. A native AUR
 package is planned; do not assume `yay -S tmail` works until it is published.
 
 ### Generic AppImage
