@@ -164,3 +164,19 @@ chain.
   Arch `makepkg` package were started under an isolated Xvfb/DBus session and
   rendered the login UI (including "TMail 0.2.2"), confirming the production
   assets and CSP bootstrap. The v0.2.1 release carries a visible warning.
+
+## Phase 7 — v0.2.3 production style fix
+
+- v0.2.2 still rendered an unstyled login form on real Wayland/WebKitGTK. The
+  global stylesheet loaded, but Svelte's component styles were injected at
+  runtime as `<style>` tags and Tauri's production CSP blocked them.
+- Production now compiles Svelte CSS with `css: 'external'`; `inline-css.mjs`
+  inlines every extracted stylesheet (global + route/component CSS) into
+  `index.html`. Dev keeps the injected style mode to avoid Vite virtual-CSS
+  startup problems.
+- Verified on the real Hyprland/Wayland session (AMD GPU): the login card is
+  styled and centered, with the theme toggle, form fields and buttons laid out
+  correctly. This was checked with text-based layout/colour metrics, not by
+  viewing screenshots.
+- v0.2.3 supersedes v0.2.1 (blank) and v0.2.2 (unstyled components); both
+  receive a visible warning.

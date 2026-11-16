@@ -181,8 +181,8 @@ you trust the build; on macOS, right-click → Open the first time.
   is sent.
 
 **v0.2.1 builds are broken:** a production CSP hash blocked the inline
-SvelteKit bootstrap, so the window stayed blank. **v0.2.2 fixes this.** Install
-v0.2.2 or newer manually once; after that, in-app updates work for
+SvelteKit bootstrap, so the window stayed blank. **v0.2.3 fixes this.** Install
+v0.2.3 or newer manually once; after that, in-app updates work for
 AppImage/Windows/macOS. v0.2.0 did not ship the updater yet.
 
 ### First start
@@ -290,8 +290,8 @@ The release workflow lives in
 [`.github/workflows/release.yml`](.github/workflows/release.yml). Push a tag:
 
 ```bash
-git tag v0.2.2
-git push origin v0.2.2
+git tag v0.2.3
+git push origin v0.2.3
 ```
 
 GitHub Actions builds on Ubuntu 24.04, Windows and macOS (universal), creates a

@@ -1,7 +1,7 @@
 {
   "name": "@tmail/ui",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "license": "GPL-3.0-or-later",
   "scripts": {
@@ -11,7 +11,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:e2e": "playwright test --reporter=line",
-    "postbuild": "node scripts/fix-csp.mjs"
+    "postbuild": "node scripts/fix-csp.mjs && node scripts/inline-css.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.9.0",
