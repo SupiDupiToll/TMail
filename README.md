@@ -180,8 +180,8 @@ you trust the build; on macOS, right-click → Open the first time.
 - The updater contacts only the project’s GitHub Releases endpoint. No telemetry
   is sent.
 
-**v0.2.1 builds are broken:** a production CSP hash blocked the inline
-SvelteKit bootstrap, so the window stayed blank. **v0.2.3 fixes this.** Install
+**v0.2.1** opened a blank window (CSP blocked the SvelteKit bootstrap) and
+**v0.2.2** rendered an unstyled login form. **v0.2.3 fixes both.** Install
 v0.2.3 or newer manually once; after that, in-app updates work for
 AppImage/Windows/macOS. v0.2.0 did not ship the updater yet.
 
