@@ -419,7 +419,7 @@ export class MailApp {
       const cached = await api.openFolder(folderId, 300);
       if (this.selectedFolderId !== folderId) return;
       this.mails = cached;
-      this.seedInboxKnown(folderId, cached);
+      void this.handleInboxMails(folderId, cached);
       this.loadingFolder = false;
       void this.refreshCurrent(true);
     } catch (error) {
@@ -454,7 +454,7 @@ export class MailApp {
       const mails = await api.refreshFolder(folderId, 300);
       if (this.selectedFolderId !== folderId) return;
       this.mails = mails;
-      this.seedInboxKnown(folderId, mails);
+      void this.handleInboxMails(folderId, mails);
       const counts = await api.unreadCounts();
       if (this.snapshot) this.snapshot = { ...this.snapshot, unread: counts };
       const total = counts.reduce((sum, entry) => sum + entry.unread, 0);
@@ -1008,10 +1008,25 @@ export class MailApp {
     setString('tmail.remote-senders', JSON.stringify(this.remoteSenders));
   }
 
-  private seedInboxKnown(folderId: string, mails: { id: string }[]): void {
+  private async handleInboxMails(folderId: string, mails: typeof this.mails): Promise<void> {
     const inbox = this.snapshot?.folders.find((folder) => folder.kind === 'inbox');
     if (inbox?.id !== folderId) return;
+    const firstRun = this.inboxKnownIds.size === 0;
+    const fresh = mails.filter((mail) => mail.unread && !this.inboxKnownIds.has(mail.id));
     for (const mail of mails) this.inboxKnownIds.add(mail.id);
+    if (
+      !firstRun &&
+      fresh.length > 0 &&
+      this.notificationsEnabled &&
+      (await this.isWindowHidden())
+    ) {
+      const newest = fresh[0];
+      void notify(
+        senderLabel(newest.sender.name, newest.sender.address),
+        newest.subject,
+        newest.id
+      );
+    }
   }
 
   private startInboxWatch(): void {
@@ -1028,21 +1043,9 @@ export class MailApp {
     const inbox = this.snapshot?.folders.find((folder) => folder.kind === 'inbox');
     if (!inbox) return;
     this.inboxCheckInFlight = true;
-    const firstRun = this.inboxKnownIds.size === 0;
     try {
       const mails = await api.refreshFolder(inbox.id, 80);
-      const fresh = mails.filter(
-        (mail) => mail.unread && !this.inboxKnownIds.has(mail.id)
-      );
-      for (const mail of mails) this.inboxKnownIds.add(mail.id);
-      if (!firstRun && fresh.length > 0 && this.notificationsEnabled && (await this.isWindowHidden())) {
-        const newest = fresh[0];
-        void notify(
-          senderLabel(newest.sender.name, newest.sender.address),
-          newest.subject,
-          newest.id
-        );
-      }
+      await this.handleInboxMails(inbox.id, mails);
     } catch {
       // Offline or session expired; the next event or poll retries.
     } finally {
