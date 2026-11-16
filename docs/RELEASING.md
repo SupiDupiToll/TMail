@@ -42,6 +42,10 @@ The workflow is in [`.github/workflows/release.yml`](../.github/workflows/releas
 
 The AppImage does not bundle WebKitGTK. It uses the system engine.
 
+**Screenshots are not release assets.** Keep review screenshots in
+`docs/review-shots/` for the README and documentation; do not upload them or a
+screenshot ZIP to a GitHub release.
+
 ## Signing and in-app updates
 
 The workflow produces **unsigned OS installers** and says so in the release
