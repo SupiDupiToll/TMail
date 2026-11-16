@@ -1,10 +1,10 @@
 # Maintainer: TMail contributors
 pkgname=tmail
-pkgver=0.2.1
+pkgver=0.2.2
 pkgrel=1
 pkgdesc="Unofficial, keyboard-first desktop client for Tuta Mail"
 arch=('x86_64' 'aarch64')
-url="https://example.invalid/tmail"
+url="https://github.com/SupiDupiToll/TMail"
 license=('GPL-3.0-or-later')
 depends=(
   'webkit2gtk-4.1'
@@ -15,24 +15,24 @@ depends=(
   'desktop-file-utils'
 )
 makedepends=('rust' 'nodejs' 'pnpm' 'git' 'libappindicator-gtk3')
-# Replace with the tagged source archive when the repository is published.
-source=("$pkgname-$pkgver.tar.gz")
+# Fixed tag, so the package always builds the released source tree.
+source=("$pkgname::git+https://github.com/SupiDupiToll/TMail.git#tag=v$pkgver")
 sha256sums=('SKIP')
 
 prepare() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
   # Locked JavaScript dependencies; the workspace pins pnpm in package.json.
   pnpm install --frozen-lockfile
 }
 
 build() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
   pnpm -C ui build
   cargo build --release --locked -p tmail-desktop
 }
 
 package() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
 
   install -Dm755 target/release/tmail-desktop "$pkgdir/usr/bin/tmail"
   install -Dm644 packaging/tmail.desktop \

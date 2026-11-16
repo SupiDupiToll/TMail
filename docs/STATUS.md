@@ -134,3 +134,25 @@ chain.
 - Verification: 58 core tests, 32 Playwright tests (1 skipped), 15 Vitest tests,
   3 desktop tests, 0 Impeccable findings; `latest.json`, installers, screenshot
   URLs and the Windows SHA-256 file were fetched from the published release.
+
+## Phase 6 — v0.2.2 production fix
+
+- v0.2.1 production builds were unusable: the CSP's inline-script hash did not
+  match SvelteKit's generated hydration bootstrap, so the webview stayed blank
+  even though its stylesheet loaded. Dev mode masked this because `devCsp`
+  allows inline scripts.
+- `ui/scripts/fix-csp.mjs` now runs as `postbuild` and externalizes executable
+  inline scripts to hashed `/bootstrap.*.js` files after `vite build`. The
+  strict production CSP stays intact (`script-src 'self'`; no `unsafe-inline`).
+- The build was verified against the exact production CSP with Chromium: the
+  app hydrates, stylesheets and injected component styles apply, and there are
+  zero `securitypolicyviolation` events. The postbuild step fails if an
+  executable inline script remains.
+- `packaging/PKGBUILD` now uses the fixed source tag
+  (`git+https://github.com/SupiDupiToll/TMail.git#tag=v$pkgver`) instead of a
+  missing local tarball, and builds from the correct `tmail` directory. `url`
+  points at the repository.
+- Tests after the fix: 58 core, 32 Playwright (1 skipped), 15 Vitest, 0
+  Svelte/A11y findings; release build succeeds with `--locked`.
+- v0.2.1 remains published with a warning; v0.2.2 is the first working
+  production release with the updater and can be installed manually once.
