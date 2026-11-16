@@ -206,3 +206,8 @@ chain.
   frame computes Source Serif/teal links, reports its full height (392 px in
   the test fixture) and has no internal overflow. Email images remain
   sanitized; remote images still require the per-sender opt-in.
+- Published `v0.2.4` on 2026-11-16 without screenshot assets, as requested.
+  The release contains packages, checksums, `latest.json` and the updater
+  transports only. All platform checksums were verified. The mail frame was
+  tested in WebKitGTK with the Tauri-like nonce CSP: Source Serif text, teal
+  links, a 392 px measured height and no internal overflow.
