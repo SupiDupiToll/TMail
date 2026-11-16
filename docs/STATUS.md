@@ -159,3 +159,8 @@ chain.
   Svelte/A11y findings; release build succeeds with `--locked`.
 - v0.2.1 remains published with a warning; v0.2.2 is the first working
   production release with the updater and can be installed manually once.
+- Published `v0.2.2` on 2026-11-16. All three checksum files verified against
+  the downloaded Linux, Windows and macOS assets. The released AppImage and an
+  Arch `makepkg` package were started under an isolated Xvfb/DBus session and
+  rendered the login UI (including "TMail 0.2.2"), confirming the production
+  assets and CSP bootstrap. The v0.2.1 release carries a visible warning.
