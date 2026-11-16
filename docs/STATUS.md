@@ -185,3 +185,24 @@ chain.
   platform URLs return 200. The released AppImage was started on the real
   Hyprland/Wayland session and shows the centered, styled login card with the
   theme switch in the top-right corner. v0.2.1 and v0.2.2 carry warnings.
+
+## Phase 8 — v0.2.4 mail rendering and scrolling
+
+- Fixed production mail rendering: the sanitized frame's wrapper CSS and email
+  CSS were inline `<style>` blocks, and its height/bootstrap was an inline
+  `<script>`. Tauri's style/script nonces make `'unsafe-inline'` ineffective,
+  so WebKit showed default serif text with blue links and kept the frame at its
+  initial height (internal scrolling).
+- The frame now loads its wrapper + sanitized sender CSS from a `data:text/css`
+  link and the trusted bootstrap from a `data:text/javascript` script. Email
+  `style` attributes are converted into generated classes in that stylesheet.
+  The parent allows `data:` for styles/scripts, and the iframe uses the HTML
+  `height` attribute instead of a blocked inline style.
+- Tauri's `style-src` nonce/hash injection is disabled for `style-src` only
+  (`dangerousDisableAssetCspModification: ["style-src"]`), preserving
+  `'unsafe-inline'` for the app's dynamic Svelte styles and the frame while
+  scripts remain nonce/hash protected.
+- Verified in Chromium with a Tauri-like nonce CSP and in WebKitGTK: the mail
+  frame computes Source Serif/teal links, reports its full height (392 px in
+  the test fixture) and has no internal overflow. Email images remain
+  sanitized; remote images still require the per-sender opt-in.

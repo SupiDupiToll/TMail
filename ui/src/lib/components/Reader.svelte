@@ -314,7 +314,7 @@
           srcdoc={sanitized.srcdoc}
           sandbox={sanitized.sandbox}
           referrerpolicy="no-referrer"
-          style:height={`${bodyHeight}px`}
+          height={bodyHeight}
         ></iframe>
       {/if}
     </div>

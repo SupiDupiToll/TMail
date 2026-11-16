@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify';
 import * as csstree from 'css-tree';
-import { BOOTSTRAP_HASH, BOOTSTRAP_SCRIPT } from './bootstrap';
+import { BOOTSTRAP_SCRIPT } from './bootstrap';
 
 /**
  * Mail HTML sanitisation and the sandboxed document wrapper.
@@ -99,10 +99,19 @@ export function sanitizeMailHtml(html: string, options: SanitizeOptions): Saniti
   if (!root) return wrap('', options, emailCss);
 
   // CSS in style attributes: keep presentation, drop resource loads/exfiltration.
+  // Tauri's nonce/hash CSP makes `unsafe-inline` ineffective for style
+  // attributes, so move each declaration list into a generated class in the
+  // frame stylesheet instead of leaving a style attribute behind.
+  const inlineCss: string[] = [];
+  let inlineIndex = 0;
   for (const element of root.querySelectorAll<HTMLElement>('[style]')) {
     const css = sanitizeCss(element.getAttribute('style') ?? '', true);
-    if (css) element.setAttribute('style', css);
-    else element.removeAttribute('style');
+    element.removeAttribute('style');
+    if (!css) continue;
+    const className = `tmail-inline-${++inlineIndex}`;
+    const existing = element.getAttribute('class')?.trim();
+    element.setAttribute('class', existing ? `${existing} ${className}` : className);
+    inlineCss.push(`.${className}{${css}}`);
   }
 
   // Legacy color attributes: accept only plain colour values.
@@ -163,7 +172,12 @@ export function sanitizeMailHtml(html: string, options: SanitizeOptions): Saniti
     img.replaceWith(replacement);
   }
 
-  return wrap(root.innerHTML, options, emailCss, Array.from(links, ([href, label]) => ({ href, label })));
+  return wrap(
+    root.innerHTML,
+    options,
+    `${emailCss}\n${inlineCss.join('\n')}`,
+    Array.from(links, ([href, label]) => ({ href, label }))
+  );
 }
 
 const BLOCKED_PROPERTIES = new Set([
@@ -264,36 +278,7 @@ function sanitizeCss(css: string, declarationList = false): string {
   }
 }
 
-function wrap(
-  body: string,
-  options: SanitizeOptions,
-  emailCss = '',
-  links: { href: string; label: string }[] = []
-): SanitizedMail {
-  const imgSrc = options.allowRemote ? 'data: https:' : 'data:';
-  const csp = [
-    "default-src 'none'",
-    `img-src ${imgSrc}`,
-    "style-src 'unsafe-inline'",
-    `script-src '${BOOTSTRAP_HASH}'`,
-    "font-src data:",
-    "connect-src 'none'",
-    "media-src 'none'",
-    "frame-src 'none'",
-    "object-src 'none'",
-    "form-action 'none'",
-    "base-uri 'none'"
-  ].join('; ');
-
-  const sender = escapeHtml(options.sender);
-  const srcdoc = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="${csp}">
-<meta name="referrer" content="no-referrer">
-<title>Message from ${sender}</title>
-<style>
+const FRAME_CSS = `
   :root { color-scheme: light; }
   html, body { margin: 0; padding: 0; }
   body {
@@ -327,18 +312,55 @@ function wrap(
     font-family: 'Atkinson Hyperlegible Next', sans-serif;
     font-size: 12px; color: #56625b;
   }
-</style>
-${emailCss ? `<style>${emailCss}</style>` : ''}
+`;
+
+function wrap(
+  body: string,
+  options: SanitizeOptions,
+  emailCss = '',
+  links: { href: string; label: string }[] = []
+): SanitizedMail {
+  const imgSrc = options.allowRemote ? 'data: https:' : 'data:';
+  const csp = [
+    "default-src 'none'",
+    `img-src ${imgSrc}`,
+    "style-src data:",
+    "style-src-attr 'unsafe-inline'",
+    "script-src data:",
+    "font-src data:",
+    "connect-src 'none'",
+    "media-src 'none'",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "form-action 'none'",
+    "base-uri 'none'"
+  ].join('; ');
+
+  // Inline <style>/<script> in a srcdoc frame is blocked once Tauri adds a
+  // nonce/hash to the parent style-src (CSP then ignores unsafe-inline). Use
+  // data: URLs for the frame CSS and the trusted bootstrap instead; both are
+  // explicit sources in the parent CSP.
+  const cssHref = `data:text/css;charset=utf-8,${encodeURIComponent(`${FRAME_CSS}\n${emailCss}`)}`;
+  const scriptHref = `data:text/javascript;base64,${btoa(BOOTSTRAP_SCRIPT)}`;
+  const sender = escapeHtml(options.sender);
+  const srcdoc = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${csp}">
+<meta name="referrer" content="no-referrer">
+<title>Message from ${sender}</title>
+<link rel="stylesheet" href="${cssHref}">
 </head>
 <body>${body}
-<script>${BOOTSTRAP_SCRIPT}</script>
+<script src="${scriptHref}"></script>
 </body>
 </html>`;
 
   return {
     srcdoc,
-    // The only script is the nonce-less, hash-pinned bootstrap above. The
-    // frame has an opaque origin, so it cannot reach the app DOM or IPC.
+    // The only script is the data: bootstrap above. The frame has an opaque
+    // origin, so it cannot reach the app DOM or IPC.
     sandbox: 'allow-scripts',
     links
   };

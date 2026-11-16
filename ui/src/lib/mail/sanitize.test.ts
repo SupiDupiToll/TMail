@@ -5,6 +5,11 @@ import { createHash } from 'node:crypto';
 
 const options = { allowRemote: false, sender: 'ada@example.com' };
 
+function frameCss(srcdoc: string): string {
+  const match = srcdoc.match(/href="data:text\/css;charset=utf-8,([^"]+)"/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
 describe('sanitizeMailHtml', () => {
   it('removes scripts and event handlers but keeps safe presentation CSS', () => {
     const { srcdoc } = sanitizeMailHtml(
@@ -13,9 +18,10 @@ describe('sanitizeMailHtml', () => {
     );
     expect(srcdoc).not.toContain('<script>window.x');
     expect(srcdoc).not.toContain('onerror');
-    expect(srcdoc).toContain('color:#9b2f29');
+    expect(frameCss(srcdoc)).toContain('color:#9b2f29');
+    expect(srcdoc).not.toContain('style="color:#9b2f29"');
     expect(srcdoc).not.toContain('evil.example');
-    expect(srcdoc).not.toContain('url(');
+    expect(frameCss(srcdoc)).not.toContain('url(');
     expect(srcdoc).toContain('Hi');
   });
 
@@ -24,12 +30,13 @@ describe('sanitizeMailHtml', () => {
       '<style>@import url("https://evil.example/x.css"); .hero{color:#1d6b5f;background:url(https://evil.example/p.gif);position:fixed} @media (min-width:600px){.hero{padding:12px}}</style><div class="hero">Hi</div>',
       options
     );
-    expect(srcdoc).toContain('.hero');
-    expect(srcdoc).toContain('color:#1d6b5f');
-    expect(srcdoc).toContain('@media');
-    expect(srcdoc).not.toContain('@import');
-    expect(srcdoc).not.toContain('evil.example');
-    expect(srcdoc).not.toContain('fixed');
+    const css = frameCss(srcdoc);
+    expect(css).toContain('.hero');
+    expect(css).toContain('color:#1d6b5f');
+    expect(css).toContain('@media');
+    expect(css).not.toContain('@import');
+    expect(css).not.toContain('evil.example');
+    expect(css).not.toContain('fixed');
   });
 
   it('keeps the mail canvas light by dropping dark-mode overrides', () => {
@@ -37,7 +44,7 @@ describe('sanitizeMailHtml', () => {
       '<style>@media (prefers-color-scheme: dark){body{background:#1a211d;color:#f5f6f3}}</style><p>Hi</p>',
       options
     );
-    expect(srcdoc).not.toContain('prefers-color-scheme: dark');
+    expect(frameCss(srcdoc)).not.toContain('prefers-color-scheme: dark');
   });
 
   it('keeps legacy presentational markup', () => {
@@ -57,7 +64,8 @@ describe('sanitizeMailHtml', () => {
     );
     expect(srcdoc).not.toContain('tracker.example');
     expect(srcdoc).toContain('[remote image blocked');
-    expect(srcdoc).toContain("script-src 'sha256-");
+    expect(srcdoc).toContain('script-src data:');
+    expect(srcdoc).toContain('style-src data:');
     expect(srcdoc).toContain("default-src 'none'");
     expect(sandbox).toBe('allow-scripts');
   });

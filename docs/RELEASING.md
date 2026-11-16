@@ -18,8 +18,8 @@ without a tag, and every release starts as a **draft** for review.
    ```
 3. Commit and push, then tag:
    ```bash
-   git tag v0.2.3
-   git push origin v0.2.3
+   git tag v0.2.4
+   git push origin v0.2.4
    ```
 4. Open the **Actions → Release** run. It builds in parallel:
    - Ubuntu 22.04: `.deb`, `.rpm`, `.AppImage` (x86_64, glibc 2.35+)

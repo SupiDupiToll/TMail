@@ -138,14 +138,33 @@ test('mail HTML is sandboxed, scripts stripped and remote pixels blocked', async
 
   const srcdoc = (await iframe.getAttribute('srcdoc')) ?? '';
   expect(srcdoc).toContain("default-src 'none'");
-  expect(srcdoc).toContain("script-src 'sha256-");
+  expect(srcdoc).toContain('script-src data:');
+  expect(srcdoc).toContain('style-src data:');
   expect(srcdoc).toContain('img-src data:');
   expect(srcdoc).not.toContain('tracker.example');
   expect(srcdoc).not.toContain('window.__pwned');
   expect(srcdoc).toContain('[remote image blocked');
-  expect(srcdoc).toContain("font-family:'Atkinson Hyperlegible Next'");
-  expect(srcdoc).toContain('border-collapse');
+  const cssMatch = srcdoc.match(/href="data:text\/css;charset=utf-8,([^"]+)"/);
+  const frameCss = cssMatch ? decodeURIComponent(cssMatch[1]) : '';
+  expect(frameCss).toContain('Atkinson Hyperlegible Next');
+  expect(frameCss).toContain('border-collapse');
   expect(srcdoc).toContain('data-href="https://example.com/verify"');
+  const frameBody = page.frameLocator('iframe').locator('body');
+  const frameMetrics = await frameBody.evaluate((body) => {
+    const style = getComputedStyle(body);
+    const link = body.querySelector('a');
+    return {
+      font: style.fontFamily,
+      linkColor: link ? getComputedStyle(link).color : null,
+      scrollHeight: document.documentElement.scrollHeight,
+      clientHeight: document.documentElement.clientHeight
+    };
+  });
+  expect(frameMetrics.font).toContain('Source Serif');
+  if (frameMetrics.linkColor) expect(frameMetrics.linkColor).not.toBe('rgb(0, 0, 238)');
+  await expect
+    .poll(() => frameBody.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight))
+    .toBeLessThanOrEqual(1);
   expect(requests).toEqual([]);
 });
 
