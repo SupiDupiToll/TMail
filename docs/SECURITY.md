@@ -44,3 +44,7 @@ cargo deny check        # if installed
 - In-app updates contact GitHub Releases only and verify the Tauri minisign
   signature against the public key in `tauri.conf.json`. `.deb`/`.rpm`/Arch
   installs disable in-app updates and use the package manager.
+- Tauri's CSP nonce/hash injection is disabled for `style-src` only. This keeps
+  `'unsafe-inline'` effective for Svelte's dynamic style attributes and the
+  sanitized mail frame; scripts remain nonce/hash protected and the mail frame
+  still runs in a sandboxed, opaque-origin iframe with its own CSP.
