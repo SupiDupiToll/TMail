@@ -185,6 +185,10 @@ you trust the build; on macOS, right-click → Open the first time.
 v0.2.3 or newer manually once; after that, in-app updates work for
 AppImage/Windows/macOS. v0.2.0 did not ship the updater yet.
 
+If `tmail` exits immediately when started from a terminal, another TMail
+instance is still running (including an AppImage or a hidden tray process).
+Close it first with `pkill -x tmail-desktop`, then start TMail again.
+
 ### First start
 
 1. Enter your Tuta address and password. TOTP is supported; U2F/WebAuthn is
