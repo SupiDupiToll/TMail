@@ -211,3 +211,18 @@ chain.
   transports only. All platform checksums were verified. The mail frame was
   tested in WebKitGTK with the Tauri-like nonce CSP: Source Serif text, teal
   links, a 392 px measured height and no internal overflow.
+
+## Phase 9 — v0.2.5 rate-limit handling
+
+- Tuta 429s are now handled as a shared client cooldown with `Retry-After`
+  (10 s fallback, max 300 s); the low-level client no longer retries a 429 three
+  times itself, so the SDK's suspendable client sees the real response once.
+- Login/API `TooManyRequests` maps to a dedicated `RateLimited` error instead of
+  `Tuta API error: Too Many Requests`.
+- WebSocket close 4429 now reconnects with the long (60–120 s) backoff instead
+  of terminating and being misreported as an expired session, which previously
+  led to a new login and more rate limiting.
+- Startup/event request bursts were reduced: cached folder lists no longer
+  trigger an immediate second fetch, contacts load when the composer opens,
+  inbox refresh is skipped when the current inbox refresh already covers it,
+  and concurrent current-folder refreshes are single-flight.

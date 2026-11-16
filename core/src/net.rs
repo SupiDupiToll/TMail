@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use tuta_sdk::bindings::rest_client::{
@@ -20,6 +20,9 @@ use tuta_sdk::net::native_rest_client::NativeRestClient;
 /// makes the client a good API citizen.
 const MAX_CONCURRENT: usize = 4;
 const MAX_ATTEMPTS: u32 = 3;
+/// If Tuta omits `Retry-After`, pause all requests for this long after a 429.
+const DEFAULT_RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(10);
+const MAX_RATE_LIMIT_COOLDOWN_SECS: u64 = 300;
 
 /// Domains owned by Tutao. The API host is derived from configuration; blob
 /// storage may live on a different Tuta host, so the owned domains are allowed
@@ -31,6 +34,9 @@ pub struct GovernedRestClient {
     allowed_scheme: String,
     allowed_host: String,
     gate: tokio::sync::Semaphore,
+    /// Shared cooldown so a 429 from one request stops the whole client from
+    /// hammering the account with parallel retries.
+    rate_limit_until: Arc<tokio::sync::Mutex<Option<Instant>>>,
     client_label: String,
 }
 
@@ -44,6 +50,7 @@ impl GovernedRestClient {
             allowed_scheme,
             allowed_host,
             gate: tokio::sync::Semaphore::new(MAX_CONCURRENT),
+            rate_limit_until: Arc::new(tokio::sync::Mutex::new(None)),
             client_label: client_label.to_string(),
         })
     }
@@ -64,6 +71,36 @@ impl GovernedRestClient {
                     .strip_suffix(domain)
                     .is_some_and(|prefix| prefix.ends_with('.'))
         })
+    }
+
+    async fn wait_for_rate_limit(&self) {
+        loop {
+            let until = { *self.rate_limit_until.lock().await };
+            let Some(until) = until else {
+                return;
+            };
+            let now = Instant::now();
+            if until <= now {
+                *self.rate_limit_until.lock().await = None;
+                return;
+            }
+            tokio::time::sleep(until - now).await;
+        }
+    }
+
+    async fn note_rate_limit(&self, response: &RestResponse) {
+        let seconds = response
+            .headers
+            .get("retry-after")
+            .and_then(|value| value.trim().parse::<u64>().ok())
+            .unwrap_or(DEFAULT_RATE_LIMIT_COOLDOWN.as_secs())
+            .clamp(1, MAX_RATE_LIMIT_COOLDOWN_SECS);
+        let until = Instant::now() + Duration::from_secs(seconds);
+        let mut guard = self.rate_limit_until.lock().await;
+        if guard.is_none_or(|current| until > current) {
+            *guard = Some(until);
+        }
+        log::warn!("Tuta rate limit (429); pausing requests for {seconds}s");
     }
 
     async fn backoff(attempt: u32) {
@@ -106,14 +143,20 @@ impl RestClient for GovernedRestClient {
             .map_err(|_| RestClientError::Unknown)?;
         let mut attempt = 0;
         loop {
+            self.wait_for_rate_limit().await;
             let result = self
                 .inner
                 .request_binary(url.clone(), clone_method(&method), clone_options(&options))
                 .await;
             match result {
+                Ok(response) if response.status == 429 => {
+                    // Let the SDK's SuspendableRestClient see the original 429
+                    // and Retry-After header; do not add our own retry storm.
+                    self.note_rate_limit(&response).await;
+                    return Ok(response);
+                }
                 Ok(response)
-                    if matches!(response.status, 429 | 502 | 503 | 504)
-                        && attempt + 1 < MAX_ATTEMPTS =>
+                    if matches!(response.status, 502..=504) && attempt + 1 < MAX_ATTEMPTS =>
                 {
                     attempt += 1;
                     log::warn!("Tuta returned {}; backing off", response.status);

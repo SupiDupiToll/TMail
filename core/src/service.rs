@@ -432,16 +432,11 @@ impl CoreService {
         active.store.list_folder(folder_id, limit, 0)
     }
 
-    /// Returns the cached list immediately; the caller may refresh it in
-    /// parallel via [`Self::refresh_folder`].
-    pub async fn open_folder(&self, folder_id: &str, limit: usize) -> Result<Vec<MailSummary>> {
+    /// Returns the cached list immediately. The UI refreshes once via
+    /// [`Self::refresh_folder`], so opening a folder never fetches twice.
+    pub fn open_folder(&self, folder_id: &str, limit: usize) -> Result<Vec<MailSummary>> {
         self.set_current_folder(Some(folder_id.to_string()));
-        if let Ok(cached) = self.cached_folder(folder_id, limit, 0) {
-            if !cached.is_empty() {
-                return Ok(cached);
-            }
-        }
-        self.refresh_folder(folder_id, limit).await
+        self.cached_folder(folder_id, limit, 0)
     }
 
     /// Called by the UI after a `mails_changed` event. Cheap when nothing

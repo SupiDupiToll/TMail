@@ -231,7 +231,6 @@ pub async fn open_folder(
     state
         .service
         .open_folder(&folder_id, limit.unwrap_or(200))
-        .await
         .map_err(ApiError::from)
 }
 

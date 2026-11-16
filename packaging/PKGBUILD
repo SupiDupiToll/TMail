@@ -1,6 +1,6 @@
 # Maintainer: TMail contributors
 pkgname=tmail
-pkgver=0.2.4
+pkgver=0.2.5
 pkgrel=1
 pkgdesc="Unofficial, keyboard-first desktop client for Tuta Mail"
 arch=('x86_64' 'aarch64')

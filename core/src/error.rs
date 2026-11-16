@@ -20,6 +20,8 @@ pub enum CoreError {
     ClientRejected,
     #[error("Tuta is temporarily unavailable; the saved session was kept")]
     TemporarilyUnavailable,
+    #[error("Tuta is rate-limiting requests; try again shortly")]
+    RateLimited,
     #[error("sign-in failed: check the address and password")]
     BadCredentials,
     #[error("the authenticator code was not accepted; try the next one")]
@@ -65,6 +67,7 @@ impl CoreError {
             Self::SessionInvalid => "session_invalid",
             Self::ClientRejected => "client_rejected",
             Self::TemporarilyUnavailable => "temporarily_unavailable",
+            Self::RateLimited => "rate_limited",
             Self::BadCredentials => "bad_credentials",
             Self::BadTotp => "bad_totp",
             Self::KeyringUnavailable => "keyring_unavailable",
@@ -94,9 +97,9 @@ impl From<ApiCallError> for CoreError {
                     Self::ClientRejected
                 }
                 tuta_sdk::rest_error::HttpError::NotFoundError => Self::NotFound,
+                tuta_sdk::rest_error::HttpError::TooManyRequestsError { .. } => Self::RateLimited,
                 tuta_sdk::rest_error::HttpError::ConnectionError
                 | tuta_sdk::rest_error::HttpError::RequestTimeoutError
-                | tuta_sdk::rest_error::HttpError::TooManyRequestsError { .. }
                 | tuta_sdk::rest_error::HttpError::InternalServerError
                 | tuta_sdk::rest_error::HttpError::BadGatewayError
                 | tuta_sdk::rest_error::HttpError::ServiceUnavailableError { .. } => {
@@ -125,6 +128,9 @@ impl From<LoginError> for CoreError {
                     | tuta_sdk::rest_error::HttpError::AccessExpiredError => Self::SessionInvalid,
                     tuta_sdk::rest_error::HttpError::InvalidSoftwareVersionError => {
                         Self::ClientRejected
+                    }
+                    tuta_sdk::rest_error::HttpError::TooManyRequestsError { .. } => {
+                        Self::RateLimited
                     }
                     _ => Self::Api(source.to_string()),
                 },

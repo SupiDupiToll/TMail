@@ -539,9 +539,10 @@ fn close_action(server_code: u16) -> CloseAction {
         server_code
     };
     match code {
-        NOT_AUTHORIZED | ACCESS_DEACTIVATED | ACCESS_BLOCKED | TOO_MANY_REQUESTS => {
-            CloseAction::Terminate(code)
-        }
+        // 429 is a rate limit, not an auth failure. Terminating here used to
+        // surface as SessionExpired and triggered a new login (and more 429s).
+        TOO_MANY_REQUESTS => CloseAction::Reconnect(RECONNECT_LARGE),
+        NOT_AUTHORIZED | ACCESS_DEACTIVATED | ACCESS_BLOCKED => CloseAction::Terminate(code),
         SESSION_EXPIRED => CloseAction::Suspend,
         NORMAL_SHUTDOWN => CloseAction::Reconnect(RECONNECT_LARGE),
         _ => CloseAction::Reconnect(RECONNECT_SMALL),
@@ -758,7 +759,14 @@ mod tests {
         assert!(matches!(close_action(4401), CloseAction::Terminate(401)));
         assert!(matches!(close_action(4470), CloseAction::Terminate(470)));
         assert!(matches!(close_action(4472), CloseAction::Terminate(472)));
-        assert!(matches!(close_action(4429), CloseAction::Terminate(429)));
+    }
+
+    #[test]
+    fn close_action_reconnects_on_rate_limit() {
+        assert!(matches!(
+            close_action(4429),
+            CloseAction::Reconnect(RECONNECT_LARGE)
+        ));
     }
 
     #[test]

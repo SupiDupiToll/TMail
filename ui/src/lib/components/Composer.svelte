@@ -18,6 +18,18 @@
 
   const composer = $derived(app.composer);
   const senders = $derived(app.snapshot?.sender_addresses ?? []);
+  let contactsRequested = false;
+
+  $effect(() => {
+    if (!composer.open) {
+      contactsRequested = false;
+      return;
+    }
+    if (!contactsRequested && app.contacts.length === 0) {
+      contactsRequested = true;
+      void app.loadContacts();
+    }
+  });
 
   const recipients = $derived([
     ...splitAddresses(composer.to),

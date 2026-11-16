@@ -194,6 +194,8 @@ export class MailApp {
   private inboxCheckInFlight = false;
   private readTimer: ReturnType<typeof setTimeout> | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private refreshPromise: Promise<void> | null = null;
+  private refreshFolderId = '';
   private unlisten: Array<() => void> = [];
   private initialised = false;
 
@@ -288,7 +290,12 @@ export class MailApp {
           if (this.auth === 'signed_in' && this.selectedFolderId) {
             void this.refreshCurrent(true);
           }
-          void this.checkInboxForNewMail();
+          const inboxId = this.snapshot?.folders.find((folder) => folder.kind === 'inbox')?.id;
+          // Refreshing the inbox as the current folder already updates the
+          // unread cache; a second inbox fetch here is the main 429 burst.
+          if (!inboxId || this.selectedFolderId !== inboxId) {
+            void this.checkInboxForNewMail();
+          }
         }, 350);
         break;
     }
@@ -376,8 +383,6 @@ export class MailApp {
       };
     }
     if (target) void this.selectFolder(target.id);
-    void this.checkInboxForNewMail();
-    void this.loadContacts();
   }
 
   async logout(): Promise<void> {
@@ -414,6 +419,7 @@ export class MailApp {
       const cached = await api.openFolder(folderId, 300);
       if (this.selectedFolderId !== folderId) return;
       this.mails = cached;
+      this.seedInboxKnown(folderId, cached);
       this.loadingFolder = false;
       void this.refreshCurrent(true);
     } catch (error) {
@@ -425,12 +431,30 @@ export class MailApp {
 
   async refreshCurrent(silent = false): Promise<void> {
     if (!this.selectedFolderId) return;
+    if (this.refreshPromise) {
+      if (this.refreshFolderId === this.selectedFolderId) return this.refreshPromise;
+      // A folder switch happened while another refresh was running. Wait for
+      // it, then refresh the newly selected folder instead of dropping it.
+      await this.refreshPromise;
+      if (!this.selectedFolderId) return;
+    }
+    const folderId = this.selectedFolderId;
+    this.refreshFolderId = folderId;
+    this.refreshPromise = this.doRefreshCurrent(silent).finally(() => {
+      this.refreshPromise = null;
+      this.refreshFolderId = '';
+    });
+    return this.refreshPromise;
+  }
+
+  private async doRefreshCurrent(silent: boolean): Promise<void> {
     if (!silent) this.refreshing = true;
     try {
       const folderId = this.selectedFolderId;
       const mails = await api.refreshFolder(folderId, 300);
       if (this.selectedFolderId !== folderId) return;
       this.mails = mails;
+      this.seedInboxKnown(folderId, mails);
       const counts = await api.unreadCounts();
       if (this.snapshot) this.snapshot = { ...this.snapshot, unread: counts };
       const total = counts.reduce((sum, entry) => sum + entry.unread, 0);
@@ -984,6 +1008,12 @@ export class MailApp {
     setString('tmail.remote-senders', JSON.stringify(this.remoteSenders));
   }
 
+  private seedInboxKnown(folderId: string, mails: { id: string }[]): void {
+    const inbox = this.snapshot?.folders.find((folder) => folder.kind === 'inbox');
+    if (inbox?.id !== folderId) return;
+    for (const mail of mails) this.inboxKnownIds.add(mail.id);
+  }
+
   private startInboxWatch(): void {
     if (this.inboxTimer) clearInterval(this.inboxTimer);
     // Event-bus delivery is the fast path; this is the safety net for missed
@@ -1080,11 +1110,17 @@ export class MailApp {
     }
   }
 
+  contactsLoading = $state(false);
+
   async loadContacts(): Promise<void> {
+    if (this.contactsLoading) return;
+    this.contactsLoading = true;
     try {
       this.contacts = await api.loadContacts();
     } catch {
       // Contacts are an enhancement; mail still works without them.
+    } finally {
+      this.contactsLoading = false;
     }
   }
 
